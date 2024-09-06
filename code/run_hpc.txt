@@ -1,0 +1,15 @@
+#!/bin/bash 
+#PBS -P Proj_test 
+#PBS -q serial 
+#PBS -l select=1:ncpus=1
+#PBS -j oe
+#PBS -N hpc_test
+cd $PBS_O_WORKDIR
+source /app1/ebenv
+
+module load R/4.3.2-gfbf-2023a
+
+
+Rscript ./run_vac_projection.R &> ./output.txt
+
+exit $?

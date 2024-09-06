@@ -1,0 +1,390 @@
+---
+title: "plotting_deng_vac"
+author: "Abhishek Senapati"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(here)
+library(ggplot2)
+library(ggpubr)
+library(tidyr)
+library(dplyr)
+```
+
+
+```{r}
+## read the output
+
+# baseline
+model_projection_v0 <- readRDS(here::here("model_output", "model_vcov_0p0_nsamp_20_veseron_zero_0.rds") )
+# specific vaccine coverage
+model_projection_v20 <- readRDS(here::here("model_output", "model_vcov_0p2_nsamp_20_veseron_zero_0.rds") )
+model_projection_v50 <- readRDS(here::here("model_output", "model_vcov_0p5_nsamp_20_veseron_zero_0.rds") )
+model_projection_v80 <- readRDS(here::here("model_output", "model_vcov_0p8_nsamp_20_veseron_zero_0.rds") )
+
+```
+
+
+```{r}
+# Function to check consistency across datasets
+check_consistency <- function(..., elements_to_check) {
+  datasets <- list(...)
+  
+  # Extract the first dataset for comparison
+  first_dataset <- datasets[[1]]
+  
+  # Loop over the rest of the datasets
+  for (i in 2:length(datasets)) {
+    for (element in elements_to_check) {
+      if (!identical(first_dataset[[element]], datasets[[i]][[element]])) {
+        stop(paste("Mismatch found in element", element, "between datasets."))
+      }
+    }
+  }
+  
+  message("All specified elements are consistent across datasets.")
+}
+
+
+# Define the elements you want to check for consistency
+elements_to_check <- c("n_sample", "n_year")
+
+# Run the consistency check
+check_consistency(
+  model_projection_v0, 
+  model_projection_v20, 
+  model_projection_v50, 
+  model_projection_v80, 
+  elements_to_check = elements_to_check
+)
+
+```
+
+
+```{r}
+n_vac_age = model_projection_v80$n_vac_age
+n_output = 10
+n_sample = model_projection_v80$n_sample
+n_age = 91
+n_year = model_projection_v80$n_year
+```
+
+
+
+```{r}
+extract_coverage_quantities <- function(model_out,
+                                        n_vac_age, 
+                                        n_output,
+                                        n_sample,
+                                        n_age,
+                                        n_year) {
+
+x <- array(NA, dim = c(n_vac_age*n_output, 
+                       n_sample,
+                       n_age,
+                       n_year))
+
+for (i in 1:(n_vac_age*n_output) ) {
+  
+  x[i,,,] <- model_out[[i]]
+  
+}
+
+out_va_oi <- array(x, dim = c(n_vac_age,
+                              n_output,
+                            n_sample, 
+                            n_age,
+                            n_year))
+
+return(list( tot_pop_age = out_va_oi[,1,,,],
+             tot_pop_age_v = out_va_oi[,2,,,],
+             tot_pop_age_nv = out_va_oi[,3,,,],
+             inf_age = out_va_oi[,4,,,],
+             inf_age_v = out_va_oi[,5,,,],
+             symp_age = out_va_oi[,6,,,],
+             symp_age_v = out_va_oi[,7,,,],
+             hosp_age = out_va_oi[,8,,,],
+             hosp_age_v = out_va_oi[,9,,,],
+             new_vac_age = out_va_oi[,10,,,]
+             ))
+}
+```
+
+```{r}
+out_vac_coverage_v0 <- extract_coverage_quantities(model_out = model_projection_v0$output[[1]], 
+                                                   n_vac_age = n_vac_age , 
+                                                   n_output = n_output, 
+                                                   n_sample = n_sample , 
+                                                   n_age = n_age,
+                                                   n_year = n_year)
+
+out_vac_coverage_v20 <- extract_coverage_quantities(model_out = model_projection_v20$output[[1]], 
+                                                   n_vac_age = n_vac_age , 
+                                                   n_output = n_output, 
+                                                   n_sample = n_sample , 
+                                                   n_age = n_age,
+                                                   n_year = n_year)
+
+
+out_vac_coverage_v50 <- extract_coverage_quantities(model_out = model_projection_v50$output[[1]], 
+                                                   n_vac_age = n_vac_age , 
+                                                   n_output = n_output, 
+                                                   n_sample = n_sample , 
+                                                   n_age = n_age,
+                                                   n_year = n_year)
+
+
+out_vac_coverage_v80 <- extract_coverage_quantities(model_out = model_projection_v80$output[[1]], 
+                                                   n_vac_age = n_vac_age , 
+                                                   n_output = n_output, 
+                                                   n_sample = n_sample , 
+                                                   n_age = n_age,
+                                                   n_year = n_year)
+
+
+```
+
+
+## plot absolute cases averted over 50 years
+```{r}
+## aggregate over all the age groups
+get_agg_over_age <- function(arr) {
+  arr_agg_age <- apply(arr, c(1,2,4), sum)
+  return(arr_agg_age)
+}
+
+## cumulative number over year
+get_cumulative_over_time <- function(arr, t_begin, t_end) {
+  arr_cum_time <- apply(arr[, , t_begin:t_end], c(1, 2), sum)
+  return(arr_cum_time)
+}
+
+
+get_averted_absolute <- function(nv_output, v_output, t_begin, t_end){
+  
+  nv_agg_age <- get_agg_over_age(nv_output)
+  v_agg_age <-  get_agg_over_age(v_output)
+  
+  nv_cum_t <- get_cumulative_over_time( nv_agg_age, t_begin = t_begin, t_end = t_end)
+  v_cum_t <- get_cumulative_over_time( v_agg_age, t_begin = t_begin, t_end = t_end)
+  
+  averted <- nv_cum_t - v_cum_t
+  
+  return(averted)
+  
+}
+
+
+
+
+
+
+get_plot_averted_absolute <- function(df_v20, df_v50, df_v80,
+                                      ylab, figure_name) {
+
+# Add a column for age groups
+df_v20$age <- 1:nrow(df_v20)
+df_v50$age <- 1:nrow(df_v50)
+df_v80$age <- 1:nrow(df_v80)
+
+# Reshape the dataframes to long format
+df_v20_long <- gather(df_v20, key = "Realization", value = "Output", -age)
+df_v50_long <- gather(df_v50, key = "Realization", value = "Output", -age)
+df_v80_long <- gather(df_v80, key = "Realization", value = "Output", -age)
+
+# Add a column to indicate the vaccine coverage for each dataset
+df_v20_long$VaccineCoverage <- "20% Coverage"
+df_v50_long$VaccineCoverage <- "50% Coverage"
+df_v80_long$VaccineCoverage <- "80% Coverage"
+
+# Combine all datasets into one long dataframe
+df_long <- bind_rows(df_v20_long, df_v50_long, df_v80_long)
+
+# Calculate the mean and 95% confidence interval for each age group and vaccine coverage
+summary_df <- df_long %>%
+  group_by(age, VaccineCoverage) %>%
+  summarise(
+    mean_output = mean(Output)/1000,
+    lower_bound = quantile(Output, 0.025)/1000,
+    upper_bound = quantile(Output, 0.975)/1000
+  ) %>%
+  ungroup()
+# Define colors for bars and their darker versions for error bars
+bar_colors <- c("20% Coverage" = "#66c2a5", "50% Coverage" = "#fc8d62", "80% Coverage" = "#8da0cb")
+errorbar_colors <- c("20% Coverage" = "#1b7a53", "50% Coverage" = "#d94e28", "80% Coverage" = "#4a5a92")
+
+
+# Plot using ggplot2 with a clean, professional style
+p <- ggplot(summary_df, aes(x = factor(age), y = mean_output, fill = VaccineCoverage)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.75), width = 0.65) +
+  geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound, color = VaccineCoverage), 
+                width = 0.0, size = 0.8, position = position_dodge(width = 0.75)) +
+  scale_fill_manual(values = bar_colors) + # Custom colors for bars
+  scale_color_manual(values = errorbar_colors) + # Custom colors for error bars
+  scale_x_discrete(
+    breaks = c(1, 3, 5, 7, 9, 11, 13, 15, 17 ),       # Set the positions of the y-axis ticks
+    labels = c("0-4y","10-14y","20-24y","30-34y", "40-44y", "50-54y", 
+               "60-64y", "70-74y", "80-84y") ) +  # Set the labels for the ticks
+  
+  scale_y_continuous(labels = scales::comma) + # Non-scientific y-axis labels
+  labs(x = "Age at vaccination", y = ylab, 
+       title = "") +
+  theme_minimal() + # Classic theme for a clean look
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5, size = 14, 
+                                   margin = margin(t = 0, b = 5), 
+                                   face = "plain", color = "black"),
+        axis.text.y = element_text(angle = 90, hjust = 0.5, size = 14, 
+                                   margin = margin(r = 0, l = 5), 
+                                   face="plain", color = "black"), # Vertical y-axis labels
+        axis.title = element_text(size = 16, face = "plain"),
+        legend.position = "top",
+        legend.direction = "horizontal",
+        legend.title = element_blank(), # No legend title for simplicity
+        legend.text = element_text(size = 16, face="plain"),
+        legend.key.size = unit(0.8, "cm"),
+        legend.background = element_blank())
+
+
+p
+### save
+# ggsave(
+#   filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
+#   plot = p,                                            # The plot object to save
+#   # width = 12,                                           # Width in inches
+#   # height = 12,                                          # Height in inches
+#   dpi = 300          )                                  # DPI (resolution)
+
+ }
+
+```
+
+## Plot symptomatic averted case
+```{r}
+
+averted_inc_v20 <- get_averted_absolute(nv_output= out_vac_coverage_v0$symp_age + 
+                                 out_vac_coverage_v0$symp_age_v,
+                                 v_output =out_vac_coverage_v20$symp_age +
+                                 out_vac_coverage_v20$symp_age_v,
+                                 t_begin = 10,
+                                 t_end = 70)
+
+averted_inc_v50 <- get_averted_absolute(nv_output= out_vac_coverage_v0$symp_age + 
+                                 out_vac_coverage_v0$symp_age_v,
+                                 v_output =out_vac_coverage_v50$symp_age +
+                                 out_vac_coverage_v50$symp_age_v,
+                                 t_begin = 10,
+                                 t_end = 70)
+
+averted_inc_v80 <- get_averted_absolute(nv_output= out_vac_coverage_v0$symp_age + 
+                                 out_vac_coverage_v0$symp_age_v,
+                                 v_output =out_vac_coverage_v80$symp_age +
+                                 out_vac_coverage_v80$symp_age_v,
+                                 t_begin = 10,
+                                 t_end = 70)
+
+
+df_v20 <- as.data.frame(averted_inc_v20)
+df_v50 <- as.data.frame(averted_inc_v50)
+df_v80 <- as.data.frame(averted_inc_v80)
+
+symp_averted_plot <- get_plot_averted_absolute(df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
+                           ylab = "Incidence of reported cases \naverted (x1000)" , figure_name = aa.jpg)
+
+symp_averted_plot 
+```
+## Plot hospitalized averted case
+
+```{r}
+
+averted_inc_v20 <- get_averted_absolute(nv_output= out_vac_coverage_v0$hosp_age + 
+                                 out_vac_coverage_v0$hosp_age_v,
+                                 v_output =out_vac_coverage_v20$hosp_age +
+                                 out_vac_coverage_v20$hosp_age_v,
+                                 t_begin = 10,
+                                 t_end = 60)
+
+averted_inc_v50 <- get_averted_absolute(nv_output= out_vac_coverage_v0$hosp_age + 
+                                 out_vac_coverage_v0$hosp_age_v,
+                                 v_output =out_vac_coverage_v50$hosp_age +
+                                 out_vac_coverage_v50$hosp_age_v,
+                                 t_begin = 10,
+                                 t_end = 60)
+
+averted_inc_v80 <- get_averted_absolute(nv_output= out_vac_coverage_v0$hosp_age + 
+                                 out_vac_coverage_v0$hosp_age_v,
+                                 v_output =out_vac_coverage_v80$hosp_age +
+                                 out_vac_coverage_v80$hosp_age_v,
+                                 t_begin = 10,
+                                 t_end = 60)
+
+
+df_v20 <- as.data.frame(averted_inc_v20)
+df_v50 <- as.data.frame(averted_inc_v50)
+df_v80 <- as.data.frame(averted_inc_v80)
+
+hosp_averted_plot <- get_plot_averted_absolute (df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
+                           ylab = "Incidence of hospitalization \naverted (x1000)" , figure_name = hh.jpeg)
+
+```
+
+
+```{r}
+averted_inc_v20 <- get_averted_absolute(nv_output= out_vac_coverage_v0$inf_age + 
+                                 out_vac_coverage_v0$inf_age_v,
+                                 v_output =out_vac_coverage_v20$inf_age +
+                                 out_vac_coverage_v20$inf_age_v,
+                                 t_begin = 10,
+                                 t_end = 19)
+
+averted_inc_v50 <- get_averted_absolute(nv_output= out_vac_coverage_v0$inf_age + 
+                                 out_vac_coverage_v0$inf_age_v,
+                                 v_output =out_vac_coverage_v50$inf_age +
+                                 out_vac_coverage_v50$inf_age_v,
+                                 t_begin = 10,
+                                 t_end = 19)
+
+averted_inc_v80 <- get_averted_absolute(nv_output= out_vac_coverage_v0$inf_age + 
+                                 out_vac_coverage_v0$inf_age_v,
+                                 v_output =out_vac_coverage_v80$inf_age +
+                                 out_vac_coverage_v80$inf_age_v,
+                                 t_begin = 10,
+                                 t_end = 19)
+
+
+df_v20 <- as.data.frame(averted_inc_v20)
+df_v50 <- as.data.frame(averted_inc_v50)
+df_v80 <- as.data.frame(averted_inc_v80)
+
+hosp_averted_plot <- get_plot_averted_absolute (df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
+                           ylab = "Incidence of hospitalization \naverted (x1000)" , figure_name = hh.jpeg)
+
+```
+
+
+
+
+```{r}
+
+out <- readRDS(here::here("model_output", "test_model_vcov_0p8_nsamp_20_veseron_zero_0.rds") )
+
+model_out <- as.data.frame(out$output, stringsAsFactors = FALSE)
+
+tot_pop <- model_out[,colnames(model_out) == "tot_pop_sample_age"]
+
+ve <- model_out[,colnames(model_out) == "eff"]
+
+
+```
+
+
+
+
+
