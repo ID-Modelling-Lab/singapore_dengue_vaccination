@@ -28,7 +28,7 @@ sero_year = 2013
 n_year <- (as.numeric(end_year) - as.numeric(begin_year)) + 1
 
 ## number of extra year for which the model will be simulated after 2021
-extra_year <- 2
+extra_year <- 70
 
 sim_year <- n_year + extra_year
 
@@ -304,7 +304,7 @@ get_ve_recursive <- function(df_efficacy,
 
 
 get_conditional_ve <- function(df_efficacy, n_vac_stage,
-                               n_sero) {
+                               n_sero, lower_bound) {
   
   month_list <- unique(df_efficacy$month)
   sero_list <- c("DENV1","DENV2", "DENV3", "DENV4")
@@ -385,21 +385,20 @@ get_conditional_ve <- function(df_efficacy, n_vac_stage,
                                                       month = month_list[i])$ve_up
       
       
-      
       if (j==3|j==4) {
         effi_symp_sero_n_array[i,j] <- 0
       }
       
       else {
-        effi_symp_sero_n_array[i,j] <-  runif(n = 1, min = symp_low_sero_n[i,j] , max = symp_up_sero_n[i,j] )
+        effi_symp_sero_n_array[i,j] <-  runif(n = 1, min = max(lower_bound,symp_low_sero_n[i,j]) , max = symp_up_sero_n[i,j] )
         # 1 - ((1 - runif(n = 1, 
         #                                                min = symp_low_sero_n[i,j] , 
         #                                                max = symp_up_sero_n[i,j] ) )/(1 - effi_inf_sero_n_array[i]))
       }
       
       
-      effi_symp_sero_p_array[i,j] <- runif(n = 1, min = symp_low_sero_p[i,j], max = symp_up_sero_p[i,j] )
-        
+      effi_symp_sero_p_array[i,j] <- runif(n = 1, min = max(lower_bound,symp_low_sero_p[i,j]), max = symp_up_sero_p[i,j] )
+      
       
       
       if (j==3|j==4) {
@@ -407,18 +406,18 @@ get_conditional_ve <- function(df_efficacy, n_vac_stage,
       }
       
       else {
-        effi_hosp_sero_n_array[i,j] <- 1 - ((1 - runif(n = 1, 
-                                                       min = hosp_low_sero_n[i,j] , 
-                                                       max = hosp_up_sero_n[i,j] ) )/(1 - effi_symp_sero_n_array[i,j]))
+        effi_hosp_sero_n_array[i,j] <- max(lower_bound, 1 - ((1 - runif(n = 1, 
+                                                                        min = max(lower_bound,hosp_low_sero_n[i,j]) , 
+                                                                        max = hosp_up_sero_n[i,j] ) )/(1 - effi_symp_sero_n_array[i,j])) )
       }
       
       if (j==3|j==4) {
         effi_hosp_sero_p_array[i,j] <- 0
       }
       else {
-        effi_hosp_sero_p_array[i,j] <- 1 - ((1 - runif(n = 1, 
-                                                       min = hosp_low_sero_p[i,j] , 
-                                                       max = hosp_up_sero_p[i,j] ) )/(1 - effi_symp_sero_p_array[i,j]))
+        effi_hosp_sero_p_array[i,j] <-  max(lower_bound, 1 - ((1 - runif(n = 1, 
+                                                                         min = max(lower_bound,hosp_low_sero_p[i,j]) , 
+                                                                         max = hosp_up_sero_p[i,j] ) )/(1 - effi_symp_sero_p_array[i,j])) )
       }
       
       
@@ -435,7 +434,6 @@ get_conditional_ve <- function(df_efficacy, n_vac_stage,
               hos_p = effi_hosp_sero_p_array))
   
 }
-
 
 ## Number of serotype
 n_sero <- 4
@@ -713,7 +711,7 @@ out_vaccine = function(par) {
 ### nested looping starts here
 
 # Define the number of cores to use
-numcores <- 4# detectCores() - 1  
+numcores <- 5 # detectCores() - 1  
 
 cl <- makeCluster(numcores)  # Adjust the number of cores based on your HPC setup
 registerDoParallel(cl)
@@ -723,7 +721,7 @@ registerDoParallel(cl)
 
 
 ## Coverage values
-v_coverage = c(0.8)
+v_coverage = 0.0
 
 
 ## indices for vaccinated age-groups
@@ -774,6 +772,7 @@ results_list <- vector("list", length(v_coverage))
 
 v_year <- 10
 vac_start <- v_year*365  ## year of vaccination start
+lower_bound <- 0.25  ## lower bound of negative efficacy 
 
 
 ### Run in parallel
@@ -799,15 +798,34 @@ for (i in 1:length(v_coverage)) {
     
     for (k in 1:n_sample) {
       print(k)
+      
+      if (vac_coverage == 0.0) {
+        effi_inf_sero_n = array(0, dim=c(n_vac_stage))
+        effi_inf_sero_p = array(0, dim=c(n_vac_stage))
+        effi_symp_sero_n = array(0, dim=c(n_vac_stage, n_sero))
+        effi_symp_sero_p = array(0, dim=c(n_vac_stage, n_sero))
+        effi_hos_sero_n = array(0, dim=c(n_vac_stage, n_sero))
+        effi_hos_sero_p = array(0, dim=c(n_vac_stage, n_sero))
+        
+        
+      }
+      
+      else {
+      
+      
       v_eff <- get_conditional_ve(df_efficacy = sero_strat_ve, 
                                   n_vac_stage = n_vac_stage , 
-                                  n_sero = n_sero)
+                                  n_sero = n_sero, lower_bound = lower_bound
+                                  )
       effi_inf_sero_n = v_eff$inf_n
       effi_inf_sero_p = v_eff$inf_p
       effi_symp_sero_n = v_eff$symp_n
       effi_symp_sero_p = v_eff$symp_p
       effi_hos_sero_n = v_eff$hos_n
       effi_hos_sero_p = v_eff$hos_p
+      }
+      
+      
       
       
       effi_symp_sero_n_sample[k,,] = effi_symp_sero_n
@@ -918,12 +936,7 @@ for (i in 1:length(v_coverage)) {
 }
 
 
-# saveRDS(list(     
-#   effi_symp_sero_n = effi_symp_sero_n_sample,
-#   effi_symp_sero_p = effi_symp_sero_p_sample,
-#   effi_hosp_sero_n = effi_hos_sero_n_sample,
-#   effi_hosp_sero_p = effi_hos_sero_p_sample),
-#         file = here::here("model_output","sampled_efficacy.rds" ))
+
 
 saveRDS(list(coverage = v_coverage, 
              n_sample = n_sample,
@@ -934,7 +947,10 @@ saveRDS(list(coverage = v_coverage,
              v_year = v_year,
              
              output=results_list), 
-        file = here::here("model_output","test_model_vcov_0p8_nsamp_20_veseron_zero_0.rds" ))
+        file = here::here("model_output", paste0("model_", "vcov_", v_coverage,
+                                                 "_nsamp_", n_sample,"_lb_", 
+                                                 lower_bound,"_ve_scenario1.rds" )))
+
 
 stopCluster(cl)
 

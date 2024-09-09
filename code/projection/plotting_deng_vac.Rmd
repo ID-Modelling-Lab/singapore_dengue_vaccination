@@ -24,11 +24,11 @@ library(dplyr)
 ## read the output
 
 # baseline
-model_projection_v0 <- readRDS(here::here("model_output", "model_vcov_0p0_nsamp_20_veseron_zero_0.rds") )
+model_projection_v0 <- readRDS(here::here("model_output", "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds") )
 # specific vaccine coverage
-model_projection_v20 <- readRDS(here::here("model_output", "model_vcov_0p2_nsamp_20_veseron_zero_0.rds") )
-model_projection_v50 <- readRDS(here::here("model_output", "model_vcov_0p5_nsamp_20_veseron_zero_0.rds") )
-model_projection_v80 <- readRDS(here::here("model_output", "model_vcov_0p8_nsamp_20_veseron_zero_0.rds") )
+model_projection_v20 <- readRDS(here::here("model_output", "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds") )
+model_projection_v50 <- readRDS(here::here("model_output", "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds") )
+model_projection_v80 <- readRDS(here::here("model_output", "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds") )
 
 ```
 
@@ -332,6 +332,7 @@ df_v80 <- as.data.frame(averted_inc_v80)
 
 hosp_averted_plot <- get_plot_averted_absolute (df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
                            ylab = "Incidence of hospitalization \naverted (x1000)" , figure_name = hh.jpeg)
+hosp_averted_plot
 
 ```
 
@@ -379,9 +380,24 @@ model_out <- as.data.frame(out$output, stringsAsFactors = FALSE)
 
 tot_pop <- model_out[,colnames(model_out) == "tot_pop_sample_age"]
 
+
+tot_pop$paste("result.1")
+
+
 ve <- model_out[,colnames(model_out) == "eff"]
 
+extract_specific_variable <- function(model_out, variable_name) {
+  
+  x <- model_out[] 
+}
 
+
+
+for (i in 1:n_vac_age) {
+  
+  x[i,,,,] <- 
+  
+}
 ```
 
 

@@ -340,7 +340,7 @@ output(inc_hosp_v[]) <- xi_1*rho_1[i]*sum(inc_hosp_v_pri[i,]) + xi_2*rho_2[i]*su
 
 
 ##
-output(new_vac_age[]) <-   vac_switch[i]*(vac_Sall[i] + sum(vac_C[i,]) + sum(vac_S[i,]) + vac_R[i]) 
+output(new_vac_age[]) <- vac_switch[i]*(vac_Sall[i] + sum(vac_C[i,]) + sum(vac_S[i,]) + vac_R[i]) 
 
 
 ## Parameters
