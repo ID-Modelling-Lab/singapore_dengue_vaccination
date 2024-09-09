@@ -21,134 +21,50 @@ library(dplyr)
 
 
 ```{r}
-## read the output
-
-# baseline
-model_projection_v0 <- readRDS(here::here("model_output", "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds") )
-# specific vaccine coverage
-model_projection_v20 <- readRDS(here::here("model_output", "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds") )
-model_projection_v50 <- readRDS(here::here("model_output", "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds") )
-model_projection_v80 <- readRDS(here::here("model_output", "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds") )
-
-```
-
-
-```{r}
-# Function to check consistency across datasets
-check_consistency <- function(..., elements_to_check) {
-  datasets <- list(...)
-  
-  # Extract the first dataset for comparison
-  first_dataset <- datasets[[1]]
-  
-  # Loop over the rest of the datasets
-  for (i in 2:length(datasets)) {
-    for (element in elements_to_check) {
-      if (!identical(first_dataset[[element]], datasets[[i]][[element]])) {
-        stop(paste("Mismatch found in element", element, "between datasets."))
-      }
-    }
-  }
-  
-  message("All specified elements are consistent across datasets.")
-}
-
-
-# Define the elements you want to check for consistency
-elements_to_check <- c("n_sample", "n_year")
-
-# Run the consistency check
-check_consistency(
-  model_projection_v0, 
-  model_projection_v20, 
-  model_projection_v50, 
-  model_projection_v80, 
-  elements_to_check = elements_to_check
-)
+# ## read the output
+# 
+# # baseline
+# model_projection_v0 <- readRDS(here::here("model_output", "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds") )
+# # specific vaccine coverage
+# model_projection_v20 <- readRDS(here::here("model_output", "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds") )
+# model_projection_v50 <- readRDS(here::here("model_output", "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds") )
+# model_projection_v80 <- readRDS(here::here("model_output", "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds") )
 
 ```
 
 
-```{r}
-n_vac_age = model_projection_v80$n_vac_age
-n_output = 10
-n_sample = model_projection_v80$n_sample
-n_age = 91
-n_year = model_projection_v80$n_year
-```
-
-
-
-```{r}
-extract_coverage_quantities <- function(model_out,
-                                        n_vac_age, 
-                                        n_output,
-                                        n_sample,
-                                        n_age,
-                                        n_year) {
-
-x <- array(NA, dim = c(n_vac_age*n_output, 
-                       n_sample,
-                       n_age,
-                       n_year))
-
-for (i in 1:(n_vac_age*n_output) ) {
-  
-  x[i,,,] <- model_out[[i]]
-  
-}
-
-out_va_oi <- array(x, dim = c(n_vac_age,
-                              n_output,
-                            n_sample, 
-                            n_age,
-                            n_year))
-
-return(list( tot_pop_age = out_va_oi[,1,,,],
-             tot_pop_age_v = out_va_oi[,2,,,],
-             tot_pop_age_nv = out_va_oi[,3,,,],
-             inf_age = out_va_oi[,4,,,],
-             inf_age_v = out_va_oi[,5,,,],
-             symp_age = out_va_oi[,6,,,],
-             symp_age_v = out_va_oi[,7,,,],
-             hosp_age = out_va_oi[,8,,,],
-             hosp_age_v = out_va_oi[,9,,,],
-             new_vac_age = out_va_oi[,10,,,]
-             ))
-}
-```
-
-```{r}
-out_vac_coverage_v0 <- extract_coverage_quantities(model_out = model_projection_v0$output[[1]], 
-                                                   n_vac_age = n_vac_age , 
-                                                   n_output = n_output, 
-                                                   n_sample = n_sample , 
-                                                   n_age = n_age,
-                                                   n_year = n_year)
-
-out_vac_coverage_v20 <- extract_coverage_quantities(model_out = model_projection_v20$output[[1]], 
-                                                   n_vac_age = n_vac_age , 
-                                                   n_output = n_output, 
-                                                   n_sample = n_sample , 
-                                                   n_age = n_age,
-                                                   n_year = n_year)
-
-
-out_vac_coverage_v50 <- extract_coverage_quantities(model_out = model_projection_v50$output[[1]], 
-                                                   n_vac_age = n_vac_age , 
-                                                   n_output = n_output, 
-                                                   n_sample = n_sample , 
-                                                   n_age = n_age,
-                                                   n_year = n_year)
-
-
-out_vac_coverage_v80 <- extract_coverage_quantities(model_out = model_projection_v80$output[[1]], 
-                                                   n_vac_age = n_vac_age , 
-                                                   n_output = n_output, 
-                                                   n_sample = n_sample , 
-                                                   n_age = n_age,
-                                                   n_year = n_year)
-
+```{r }
+# # Function to check consistency across datasets
+# check_consistency <- function(..., elements_to_check) {
+#   datasets <- list(...)
+#   
+#   # Extract the first dataset for comparison
+#   first_dataset <- datasets[[1]]
+#   
+#   # Loop over the rest of the datasets
+#   for (i in 2:length(datasets)) {
+#     for (element in elements_to_check) {
+#       if (!identical(first_dataset[[element]], datasets[[i]][[element]])) {
+#         stop(paste("Mismatch found in element", element, "between datasets."))
+#       }
+#     }
+#   }
+#   
+#   message("All specified elements are consistent across datasets.")
+# }
+# 
+# 
+# # Define the elements you want to check for consistency
+# elements_to_check <- c("n_sample", "n_year")
+# 
+# # Run the consistency check
+# check_consistency(
+#   model_projection_v0, 
+#   model_projection_v20, 
+#   model_projection_v50, 
+#   model_projection_v80, 
+#   elements_to_check = elements_to_check
+# )
 
 ```
 
@@ -266,29 +182,83 @@ p
 
 ```
 
-## Plot symptomatic averted case
+
+
 ```{r}
 
-averted_inc_v20 <- get_averted_absolute(nv_output= out_vac_coverage_v0$symp_age + 
-                                 out_vac_coverage_v0$symp_age_v,
-                                 v_output =out_vac_coverage_v20$symp_age +
-                                 out_vac_coverage_v20$symp_age_v,
-                                 t_begin = 10,
-                                 t_end = 70)
+extract_variable <- function(rds_file, variable_name) {
+  
+result <- readRDS(here::here("model_output",  rds_file) )
 
-averted_inc_v50 <- get_averted_absolute(nv_output= out_vac_coverage_v0$symp_age + 
-                                 out_vac_coverage_v0$symp_age_v,
-                                 v_output =out_vac_coverage_v50$symp_age +
-                                 out_vac_coverage_v50$symp_age_v,
-                                 t_begin = 10,
-                                 t_end = 70)
+out_v <- as.data.frame(result$output, stringsAsFactors = FALSE)
 
-averted_inc_v80 <- get_averted_absolute(nv_output= out_vac_coverage_v0$symp_age + 
-                                 out_vac_coverage_v0$symp_age_v,
-                                 v_output =out_vac_coverage_v80$symp_age +
-                                 out_vac_coverage_v80$symp_age_v,
+
+n_vac_age = result$n_vac_age
+n_sample = result$n_sample
+n_age = result$n_age
+n_year = result$n_year
+  
+  
+  
+  x <- out_v[,colnames(out_v) == variable_name] 
+  
+  y <- array(NA, dim = c(n_vac_age,n_sample, n_age, n_year))
+  
+  for (i in 1:n_vac_age) {
+  
+  y[i,,,] <- x[[paste0("result.", i)]]
+  }
+  
+  return(y)
+}
+
+
+
+```
+
+
+
+## Symptomatic 
+```{r}
+nv_symp <- extract_variable(rds_file = "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds" , 
+                            variable_name = "symp_sample_age") + 
+           extract_variable(rds_file = "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds", 
+                            variable_name = "symp_sample_age_v")
+
+v_symp_20 <- extract_variable(rds_file = "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds",
+                              variable_name = "symp_sample_age") + 
+           extract_variable(rds_file = "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds", 
+                            variable_name = "symp_sample_age_v")
+
+v_symp_50 <- extract_variable(rds_file = "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds",
+                              variable_name = "symp_sample_age") + 
+           extract_variable(rds_file = "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds",
+                            variable_name = "symp_sample_age_v")
+
+v_symp_80 <- extract_variable(rds_file = "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds",
+                              variable_name = "symp_sample_age") + 
+           extract_variable(rds_file = "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds", 
+                            variable_name = "symp_sample_age_v")
+
+
+
+averted_inc_v20 <- get_averted_absolute(nv_output = nv_symp,
+                                 v_output = v_symp_20,
                                  t_begin = 10,
-                                 t_end = 70)
+                                 t_end = 60)
+
+averted_inc_v50 <- get_averted_absolute(nv_output = nv_symp,
+                                 v_output = v_symp_50,
+                                 t_begin = 10,
+                                 t_end = 60)
+
+
+averted_inc_v80 <- get_averted_absolute(nv_output = nv_symp,
+                                 v_output = v_symp_80,
+                                 t_begin = 10,
+                                 t_end = 60)
+
+
 
 
 df_v20 <- as.data.frame(averted_inc_v20)
@@ -300,107 +270,117 @@ symp_averted_plot <- get_plot_averted_absolute(df_v20 = df_v20 , df_v50 = df_v50
 
 symp_averted_plot 
 ```
-## Plot hospitalized averted case
 
+
+
+
+
+## Infection 
 ```{r}
+nv_inf <- extract_variable(rds_file = "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds" , 
+                            variable_name = "inf_sample_age") + 
+           extract_variable(rds_file = "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds", 
+                            variable_name = "inf_sample_age_v")
 
-averted_inc_v20 <- get_averted_absolute(nv_output= out_vac_coverage_v0$hosp_age + 
-                                 out_vac_coverage_v0$hosp_age_v,
-                                 v_output =out_vac_coverage_v20$hosp_age +
-                                 out_vac_coverage_v20$hosp_age_v,
+v_inf_20 <- extract_variable(rds_file = "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds",
+                              variable_name = "inf_sample_age") + 
+           extract_variable(rds_file = "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds", 
+                            variable_name = "inf_sample_age_v")
+
+v_inf_50 <- extract_variable(rds_file = "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds",
+                              variable_name = "inf_sample_age") + 
+           extract_variable(rds_file = "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds",
+                            variable_name = "inf_sample_age_v")
+
+v_inf_80 <- extract_variable(rds_file = "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds",
+                              variable_name = "inf_sample_age") + 
+           extract_variable(rds_file = "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds", 
+                            variable_name = "inf_sample_age_v")
+
+
+
+averted_inc_v20 <- get_averted_absolute(nv_output = nv_inf,
+                                 v_output = v_inf_20,
                                  t_begin = 10,
                                  t_end = 60)
 
-averted_inc_v50 <- get_averted_absolute(nv_output= out_vac_coverage_v0$hosp_age + 
-                                 out_vac_coverage_v0$hosp_age_v,
-                                 v_output =out_vac_coverage_v50$hosp_age +
-                                 out_vac_coverage_v50$hosp_age_v,
+averted_inc_v50 <- get_averted_absolute(nv_output = nv_inf,
+                                 v_output = v_inf_50,
                                  t_begin = 10,
                                  t_end = 60)
 
-averted_inc_v80 <- get_averted_absolute(nv_output= out_vac_coverage_v0$hosp_age + 
-                                 out_vac_coverage_v0$hosp_age_v,
-                                 v_output =out_vac_coverage_v80$hosp_age +
-                                 out_vac_coverage_v80$hosp_age_v,
+
+averted_inc_v80 <- get_averted_absolute(nv_output = nv_inf,
+                                 v_output = v_inf_80,
                                  t_begin = 10,
                                  t_end = 60)
+
+
 
 
 df_v20 <- as.data.frame(averted_inc_v20)
 df_v50 <- as.data.frame(averted_inc_v50)
 df_v80 <- as.data.frame(averted_inc_v80)
 
-hosp_averted_plot <- get_plot_averted_absolute (df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
-                           ylab = "Incidence of hospitalization \naverted (x1000)" , figure_name = hh.jpeg)
-hosp_averted_plot
+inf_averted_plot <- get_plot_averted_absolute(df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
+                           ylab = "Incidence of infection \naverted (x1000)" , figure_name = aa.jpg)
 
+inf_averted_plot 
 ```
 
 
+
+
+## hospitalization
 ```{r}
-averted_inc_v20 <- get_averted_absolute(nv_output= out_vac_coverage_v0$inf_age + 
-                                 out_vac_coverage_v0$inf_age_v,
-                                 v_output =out_vac_coverage_v20$inf_age +
-                                 out_vac_coverage_v20$inf_age_v,
-                                 t_begin = 10,
-                                 t_end = 19)
+nv_hosp <- extract_variable(rds_file = "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds" , 
+                            variable_name = "hosp_sample_age") + 
+           extract_variable(rds_file = "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds", 
+                            variable_name = "hosp_sample_age_v")
 
-averted_inc_v50 <- get_averted_absolute(nv_output= out_vac_coverage_v0$inf_age + 
-                                 out_vac_coverage_v0$inf_age_v,
-                                 v_output =out_vac_coverage_v50$inf_age +
-                                 out_vac_coverage_v50$inf_age_v,
-                                 t_begin = 10,
-                                 t_end = 19)
+v_hosp_20 <- extract_variable(rds_file = "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds",
+                              variable_name = "hosp_sample_age") + 
+           extract_variable(rds_file = "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds", 
+                            variable_name = "hosp_sample_age_v")
 
-averted_inc_v80 <- get_averted_absolute(nv_output= out_vac_coverage_v0$inf_age + 
-                                 out_vac_coverage_v0$inf_age_v,
-                                 v_output =out_vac_coverage_v80$inf_age +
-                                 out_vac_coverage_v80$inf_age_v,
+v_hosp_50 <- extract_variable(rds_file = "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds",
+                              variable_name = "hosp_sample_age") + 
+           extract_variable(rds_file = "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds",
+                            variable_name = "hosp_sample_age_v")
+
+v_hosp_80 <- extract_variable(rds_file = "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds",
+                              variable_name = "hosp_sample_age") + 
+           extract_variable(rds_file = "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds", 
+                            variable_name = "hosp_sample_age_v")
+
+
+
+averted_inc_v20 <- get_averted_absolute(nv_output = nv_hosp,
+                                 v_output = v_hosp_20,
                                  t_begin = 10,
-                                 t_end = 19)
+                                 t_end = 60)
+
+averted_inc_v50 <- get_averted_absolute(nv_output = nv_hosp,
+                                 v_output = v_hosp_50,
+                                 t_begin = 10,
+                                 t_end = 60)
+
+
+averted_inc_v80 <- get_averted_absolute(nv_output = nv_hosp,
+                                 v_output = v_hosp_80,
+                                 t_begin = 10,
+                                 t_end = 60)
+
+
 
 
 df_v20 <- as.data.frame(averted_inc_v20)
 df_v50 <- as.data.frame(averted_inc_v50)
 df_v80 <- as.data.frame(averted_inc_v80)
 
-hosp_averted_plot <- get_plot_averted_absolute (df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
-                           ylab = "Incidence of hospitalization \naverted (x1000)" , figure_name = hh.jpeg)
+hosp_averted_plot <- get_plot_averted_absolute(df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
+                           ylab = "Incidence of reported cases \naverted (x1000)" , figure_name = aa.jpg)
 
+hosp_averted_plot 
 ```
-
-
-
-
-```{r}
-
-out <- readRDS(here::here("model_output", "test_model_vcov_0p8_nsamp_20_veseron_zero_0.rds") )
-
-model_out <- as.data.frame(out$output, stringsAsFactors = FALSE)
-
-tot_pop <- model_out[,colnames(model_out) == "tot_pop_sample_age"]
-
-
-tot_pop$paste("result.1")
-
-
-ve <- model_out[,colnames(model_out) == "eff"]
-
-extract_specific_variable <- function(model_out, variable_name) {
-  
-  x <- model_out[] 
-}
-
-
-
-for (i in 1:n_vac_age) {
-  
-  x[i,,,,] <- 
-  
-}
-```
-
-
-
-
 
