@@ -20,19 +20,6 @@ library(dplyr)
 ```
 
 
-```{r}
-# ## read the output
-# 
-# # baseline
-# model_projection_v0 <- readRDS(here::here("model_output", "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds") )
-# # specific vaccine coverage
-# model_projection_v20 <- readRDS(here::here("model_output", "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds") )
-# model_projection_v50 <- readRDS(here::here("model_output", "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds") )
-# model_projection_v80 <- readRDS(here::here("model_output", "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds") )
-
-```
-
-
 ```{r }
 # # Function to check consistency across datasets
 # check_consistency <- function(..., elements_to_check) {
@@ -84,7 +71,7 @@ get_cumulative_over_time <- function(arr, t_begin, t_end) {
 }
 
 
-get_averted_absolute <- function(nv_output, v_output, t_begin, t_end){
+get_averted <- function(nv_output, v_output, t_begin, t_end, output_type){
   
   nv_agg_age <- get_agg_over_age(nv_output)
   v_agg_age <-  get_agg_over_age(v_output)
@@ -92,18 +79,23 @@ get_averted_absolute <- function(nv_output, v_output, t_begin, t_end){
   nv_cum_t <- get_cumulative_over_time( nv_agg_age, t_begin = t_begin, t_end = t_end)
   v_cum_t <- get_cumulative_over_time( v_agg_age, t_begin = t_begin, t_end = t_end)
   
-  averted <- nv_cum_t - v_cum_t
+  if (output_type == "absolute") {
+  
+  averted <- (nv_cum_t - v_cum_t)
+  }
+  
+  if (output_type == "proportion") {
+  
+    averted <- 100*(nv_cum_t - v_cum_t)/nv_cum_t
+   }
+  
   
   return(averted)
   
 }
 
 
-
-
-
-
-get_plot_averted_absolute <- function(df_v20, df_v50, df_v80,
+get_plot_averted <- function(df_v20, df_v50, df_v80,
                                       ylab, figure_name) {
 
 # Add a column for age groups
@@ -128,9 +120,9 @@ df_long <- bind_rows(df_v20_long, df_v50_long, df_v80_long)
 summary_df <- df_long %>%
   group_by(age, VaccineCoverage) %>%
   summarise(
-    mean_output = mean(Output)/1000,
-    lower_bound = quantile(Output, 0.025)/1000,
-    upper_bound = quantile(Output, 0.975)/1000
+    mean_output = mean(Output),
+    lower_bound = quantile(Output, 0.025),
+    upper_bound = quantile(Output, 0.975)
   ) %>%
   ungroup()
 # Define colors for bars and their darker versions for error bars
@@ -192,6 +184,8 @@ result <- readRDS(here::here("model_output",  rds_file) )
 
 out_v <- as.data.frame(result$output, stringsAsFactors = FALSE)
 
+# rm(list=c("result"))
+
 
 n_vac_age = result$n_vac_age
 n_sample = result$n_sample
@@ -220,43 +214,46 @@ n_year = result$n_year
 
 ## Symptomatic 
 ```{r}
-nv_symp <- extract_variable(rds_file = "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds" , 
+nv_symp <- extract_variable(rds_file = "test_model_vcov_0_nsamp_20_lb_-0.25_ve_scenario1.rds" , 
                             variable_name = "symp_sample_age") + 
-           extract_variable(rds_file = "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds", 
+           extract_variable(rds_file = "test_model_vcov_0_nsamp_20_lb_-0.25_ve_scenario1.rds", 
                             variable_name = "symp_sample_age_v")
 
-v_symp_20 <- extract_variable(rds_file = "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds",
+v_symp_20 <- extract_variable(rds_file = "test_model_vcov_0.2_nsamp_20_lb_-0.25_ve_scenario1.rds",
                               variable_name = "symp_sample_age") + 
-           extract_variable(rds_file = "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds", 
+           extract_variable(rds_file = "test_model_vcov_0.2_nsamp_20_lb_-0.25_ve_scenario1.rds", 
                             variable_name = "symp_sample_age_v")
 
-v_symp_50 <- extract_variable(rds_file = "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds",
+v_symp_50 <- extract_variable(rds_file = "test_model_vcov_0.5_nsamp_20_lb_-0.25_ve_scenario1.rds",
                               variable_name = "symp_sample_age") + 
-           extract_variable(rds_file = "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds",
+           extract_variable(rds_file = "test_model_vcov_0.5_nsamp_20_lb_-0.25_ve_scenario1.rds",
                             variable_name = "symp_sample_age_v")
 
-v_symp_80 <- extract_variable(rds_file = "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds",
+v_symp_80 <- extract_variable(rds_file = "test_model_vcov_0.8_nsamp_20_lb_-0.25_ve_scenario1.rds",
                               variable_name = "symp_sample_age") + 
-           extract_variable(rds_file = "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds", 
+           extract_variable(rds_file = "test_model_vcov_0.8_nsamp_20_lb_-0.25_ve_scenario1.rds", 
                             variable_name = "symp_sample_age_v")
 
 
 
-averted_inc_v20 <- get_averted_absolute(nv_output = nv_symp,
+averted_inc_v20 <- get_averted(nv_output = nv_symp,
                                  v_output = v_symp_20,
                                  t_begin = 10,
-                                 t_end = 60)
+                                 t_end = 40,
+                                  output_type = "proportion")
 
-averted_inc_v50 <- get_averted_absolute(nv_output = nv_symp,
+averted_inc_v50 <- get_averted(nv_output = nv_symp,
                                  v_output = v_symp_50,
                                  t_begin = 10,
-                                 t_end = 60)
+                                 t_end = 40,
+                                output_type = "proportion")
 
 
-averted_inc_v80 <- get_averted_absolute(nv_output = nv_symp,
-                                 v_output = v_symp_80,
-                                 t_begin = 10,
-                                 t_end = 60)
+averted_inc_v80 <- get_averted(nv_output = nv_symp,
+                               v_output = v_symp_80,
+                               t_begin = 10,
+                               t_end = 40,
+                               output_type = "proportion")
 
 
 
@@ -265,10 +262,11 @@ df_v20 <- as.data.frame(averted_inc_v20)
 df_v50 <- as.data.frame(averted_inc_v50)
 df_v80 <- as.data.frame(averted_inc_v80)
 
-symp_averted_plot <- get_plot_averted_absolute(df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
-                           ylab = "Incidence of reported cases \naverted (x1000)" , figure_name = aa.jpg)
+symp_averted_plot <- get_plot_averted(df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
+                           ylab = "Reported cases averted (%)" , figure_name = aa.jpg)
 
 symp_averted_plot 
+
 ```
 
 
@@ -277,43 +275,46 @@ symp_averted_plot
 
 ## Infection 
 ```{r}
-nv_inf <- extract_variable(rds_file = "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds" , 
+nv_inf <- extract_variable(rds_file = "test_model_vcov_0_nsamp_20_lb_-0.25_ve_scenario1.rds" , 
                             variable_name = "inf_sample_age") + 
-           extract_variable(rds_file = "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds", 
+           extract_variable(rds_file = "test_model_vcov_0_nsamp_20_lb_-0.25_ve_scenario1.rds", 
                             variable_name = "inf_sample_age_v")
 
-v_inf_20 <- extract_variable(rds_file = "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds",
+v_inf_20 <- extract_variable(rds_file = "test_model_vcov_0.2_nsamp_20_lb_-0.25_ve_scenario1.rds",
                               variable_name = "inf_sample_age") + 
-           extract_variable(rds_file = "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds", 
+           extract_variable(rds_file = "test_model_vcov_0.2_nsamp_20_lb_-0.25_ve_scenario1.rds", 
                             variable_name = "inf_sample_age_v")
 
-v_inf_50 <- extract_variable(rds_file = "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds",
+v_inf_50 <- extract_variable(rds_file = "test_model_vcov_0.5_nsamp_20_lb_-0.25_ve_scenario1.rds",
                               variable_name = "inf_sample_age") + 
-           extract_variable(rds_file = "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds",
+           extract_variable(rds_file = "test_model_vcov_0.5_nsamp_20_lb_-0.25_ve_scenario1.rds",
                             variable_name = "inf_sample_age_v")
 
-v_inf_80 <- extract_variable(rds_file = "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds",
+v_inf_80 <- extract_variable(rds_file = "test_model_vcov_0.8_nsamp_20_lb_-0.25_ve_scenario1.rds",
                               variable_name = "inf_sample_age") + 
-           extract_variable(rds_file = "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds", 
+           extract_variable(rds_file = "test_model_vcov_0.8_nsamp_20_lb_-0.25_ve_scenario1.rds", 
                             variable_name = "inf_sample_age_v")
 
 
 
-averted_inc_v20 <- get_averted_absolute(nv_output = nv_inf,
+averted_inc_v20 <- get_averted(nv_output = nv_inf,
                                  v_output = v_inf_20,
                                  t_begin = 10,
-                                 t_end = 60)
+                                 t_end = 60,
+                                  output_type = "proportion")
 
-averted_inc_v50 <- get_averted_absolute(nv_output = nv_inf,
+averted_inc_v50 <- get_averted(nv_output = nv_inf,
                                  v_output = v_inf_50,
                                  t_begin = 10,
-                                 t_end = 60)
+                                 t_end = 60,
+                                  output_type = "proportion")
 
 
-averted_inc_v80 <- get_averted_absolute(nv_output = nv_inf,
+averted_inc_v80 <- get_averted(nv_output = nv_inf,
                                  v_output = v_inf_80,
                                  t_begin = 10,
-                                 t_end = 60)
+                                 t_end = 60,
+                                  output_type = "proportion")
 
 
 
@@ -322,7 +323,7 @@ df_v20 <- as.data.frame(averted_inc_v20)
 df_v50 <- as.data.frame(averted_inc_v50)
 df_v80 <- as.data.frame(averted_inc_v80)
 
-inf_averted_plot <- get_plot_averted_absolute(df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
+inf_averted_plot <- get_plot_averted(df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
                            ylab = "Incidence of infection \naverted (x1000)" , figure_name = aa.jpg)
 
 inf_averted_plot 
@@ -333,43 +334,46 @@ inf_averted_plot
 
 ## hospitalization
 ```{r}
-nv_hosp <- extract_variable(rds_file = "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds" , 
+nv_hosp <- extract_variable(rds_file = "test_model_vcov_0_nsamp_20_lb_-0.25_ve_scenario1.rds" , 
                             variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "model_vcov_0_nsamp_50_lb_0.25_ve_scenario1.rds", 
+           extract_variable(rds_file = "test_model_vcov_0_nsamp_20_lb_-0.25_ve_scenario1.rds", 
                             variable_name = "hosp_sample_age_v")
 
-v_hosp_20 <- extract_variable(rds_file = "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds",
+v_hosp_20 <- extract_variable(rds_file = "test_model_vcov_0.2_nsamp_20_lb_-0.25_ve_scenario1.rds",
                               variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "model_vcov_0.2_nsamp_50_lb_0.25_ve_scenario1.rds", 
+           extract_variable(rds_file = "test_model_vcov_0.2_nsamp_20_lb_-0.25_ve_scenario1.rds", 
                             variable_name = "hosp_sample_age_v")
 
-v_hosp_50 <- extract_variable(rds_file = "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds",
+v_hosp_50 <- extract_variable(rds_file = "test_model_vcov_0.5_nsamp_20_lb_-0.25_ve_scenario1.rds",
                               variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "model_vcov_0.5_nsamp_50_lb_0.25_ve_scenario1.rds",
+           extract_variable(rds_file = "test_model_vcov_0.5_nsamp_20_lb_-0.25_ve_scenario1.rds",
                             variable_name = "hosp_sample_age_v")
 
-v_hosp_80 <- extract_variable(rds_file = "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds",
+v_hosp_80 <- extract_variable(rds_file = "test_model_vcov_0.8_nsamp_20_lb_-0.25_ve_scenario1.rds",
                               variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "model_vcov_0.8_nsamp_50_lb_0.25_ve_scenario1.rds", 
+           extract_variable(rds_file = "test_model_vcov_0.8_nsamp_20_lb_-0.25_ve_scenario1.rds", 
                             variable_name = "hosp_sample_age_v")
 
 
 
-averted_inc_v20 <- get_averted_absolute(nv_output = nv_hosp,
+averted_inc_v20 <- get_averted(nv_output = nv_hosp,
                                  v_output = v_hosp_20,
                                  t_begin = 10,
-                                 t_end = 60)
+                                 t_end = 60,
+                                  output_type = "proportion")
 
-averted_inc_v50 <- get_averted_absolute(nv_output = nv_hosp,
+averted_inc_v50 <- get_averted(nv_output = nv_hosp,
                                  v_output = v_hosp_50,
                                  t_begin = 10,
-                                 t_end = 60)
+                                 t_end = 60,
+                                  output_type = "proportion")
 
 
-averted_inc_v80 <- get_averted_absolute(nv_output = nv_hosp,
+averted_inc_v80 <- get_averted(nv_output = nv_hosp,
                                  v_output = v_hosp_80,
                                  t_begin = 10,
-                                 t_end = 60)
+                                 t_end = 60,
+                                  output_type = "proportion")
 
 
 
@@ -378,9 +382,62 @@ df_v20 <- as.data.frame(averted_inc_v20)
 df_v50 <- as.data.frame(averted_inc_v50)
 df_v80 <- as.data.frame(averted_inc_v80)
 
-hosp_averted_plot <- get_plot_averted_absolute(df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
+hosp_averted_plot <- get_plot_averted(df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
                            ylab = "Incidence of reported cases \naverted (x1000)" , figure_name = aa.jpg)
 
 hosp_averted_plot 
+```
+
+
+
+
+
+
+## Plot the vaccine coverage
+
+```{r}
+
+total_pop_age <- extract_variable(rds_file = "test_model_vcov_0.2_nsamp_20_lb_-0.25_ve_scenario1.rds",
+                              variable_name = "tot_pop_sample_age")
+
+v_vac_age_20 <- extract_variable(rds_file = "test_model_vcov_0.2_nsamp_20_lb_-0.25_ve_scenario1.rds",
+                              variable_name = "tot_pop_sample_age_v")
+
+v_vac_age_50 <- extract_variable(rds_file = "test_model_vcov_0.5_nsamp_20_lb_-0.25_ve_scenario1.rds",
+                              variable_name = "tot_pop_sample_age_v") 
+
+v_vac_age_80 <- extract_variable(rds_file = "test_model_vcov_0.8_nsamp_20_lb_-0.25_ve_scenario1.rds",
+                              variable_name = "tot_pop_sample_age_v")
+# total_pop <- get_agg_over_age(total_pop_age)
+# 
+# total_vac_20 <- get_agg_over_age(v_vac_age_20)
+# 
+# 
+# total_vac_50 <- get_agg_over_age(v_vac_age_50)
+
+matplot(t(v_vac_age_20[2,1,,]/total_pop_age[2,1,,]), type = "l")
+```
+```{r}
+
+v_a = matrix( c(1,5,6,10,
+                11,15,16,20,
+                21,25,26,30,
+                31,35,36,40,
+                41,45,46,50,
+                51,55,56,60,
+                61,65,66,70,
+                71,75,76,80,
+                81,85
+), nrow = 17, ncol = 2, byrow = TRUE)
+
+
+
+get_agg_over_diff_age <- function(arr) {
+  
+  
+  arr_agg_age <- apply(arr, c(1,2,4), sum)
+  
+  return(arr_agg_age)
+}
 ```
 
