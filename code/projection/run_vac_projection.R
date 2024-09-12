@@ -772,7 +772,7 @@ results_list <- vector("list", length(v_coverage))
 
 v_year <- 10
 vac_start <- v_year*365  ## year of vaccination start
-lower_bound <- 0.25  ## lower bound of negative efficacy 
+lower_bound <- -0.25  ## lower bound of negative efficacy 
 
 
 ### Run in parallel
@@ -937,7 +937,7 @@ for (i in 1:length(v_coverage)) {
 
 
 
-
+## TO add v_a in the output list also start of vaccination year
 saveRDS(list(coverage = v_coverage, 
              n_sample = n_sample,
              n_sero = n_sero,
@@ -947,7 +947,7 @@ saveRDS(list(coverage = v_coverage,
              v_year = v_year,
              
              output=results_list), 
-        file = here::here("model_output", paste0("model_", "vcov_", v_coverage,
+        file = here::here("model_output", paste0("test_model_", "vcov_", v_coverage,
                                                  "_nsamp_", n_sample,"_lb_", 
                                                  lower_bound,"_ve_scenario1.rds" )))
 
