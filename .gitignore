@@ -1,0 +1,8 @@
+/presentations/*
+/Dengue_model_literature/*
+/code/model_output/*
+/Draft/*
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata

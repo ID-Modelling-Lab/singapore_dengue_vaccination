@@ -239,20 +239,20 @@ v_symp_80 <- extract_variable(rds_file = "test_model_vcov_0.8_nsamp_20_lb_-0.25_
 averted_inc_v20 <- get_averted(nv_output = nv_symp,
                                  v_output = v_symp_20,
                                  t_begin = 10,
-                                 t_end = 40,
+                                 t_end = 60,
                                   output_type = "proportion")
 
 averted_inc_v50 <- get_averted(nv_output = nv_symp,
                                  v_output = v_symp_50,
                                  t_begin = 10,
-                                 t_end = 40,
+                                 t_end = 60,
                                 output_type = "proportion")
 
 
 averted_inc_v80 <- get_averted(nv_output = nv_symp,
                                v_output = v_symp_80,
                                t_begin = 10,
-                               t_end = 40,
+                               t_end = 60,
                                output_type = "proportion")
 
 
@@ -275,24 +275,24 @@ symp_averted_plot
 
 ## Infection 
 ```{r}
-nv_inf <- extract_variable(rds_file = "test_model_vcov_0_nsamp_20_lb_-0.25_ve_scenario1.rds" , 
+nv_inf <- extract_variable(rds_file = "test_model_vcov_0_nsamp_50_lb_-0.25_ve_scenario1.rds" , 
                             variable_name = "inf_sample_age") + 
-           extract_variable(rds_file = "test_model_vcov_0_nsamp_20_lb_-0.25_ve_scenario1.rds", 
+           extract_variable(rds_file = "test_model_vcov_0_nsamp_50_lb_-0.25_ve_scenario1.rds", 
                             variable_name = "inf_sample_age_v")
 
-v_inf_20 <- extract_variable(rds_file = "test_model_vcov_0.2_nsamp_20_lb_-0.25_ve_scenario1.rds",
+v_inf_20 <- extract_variable(rds_file = "test_model_vcov_0.2_nsamp_50_lb_-0.25_ve_scenario1.rds",
                               variable_name = "inf_sample_age") + 
-           extract_variable(rds_file = "test_model_vcov_0.2_nsamp_20_lb_-0.25_ve_scenario1.rds", 
+           extract_variable(rds_file = "test_model_vcov_0.2_nsamp_50_lb_-0.25_ve_scenario1.rds", 
                             variable_name = "inf_sample_age_v")
 
-v_inf_50 <- extract_variable(rds_file = "test_model_vcov_0.5_nsamp_20_lb_-0.25_ve_scenario1.rds",
+v_inf_50 <- extract_variable(rds_file = "test_model_vcov_0.5_nsamp_50_lb_-0.25_ve_scenario1.rds",
                               variable_name = "inf_sample_age") + 
-           extract_variable(rds_file = "test_model_vcov_0.5_nsamp_20_lb_-0.25_ve_scenario1.rds",
+           extract_variable(rds_file = "test_model_vcov_0.5_nsamp_50_lb_-0.25_ve_scenario1.rds",
                             variable_name = "inf_sample_age_v")
 
-v_inf_80 <- extract_variable(rds_file = "test_model_vcov_0.8_nsamp_20_lb_-0.25_ve_scenario1.rds",
+v_inf_80 <- extract_variable(rds_file = "test_model_vcov_0.8_nsamp_50_lb_-0.25_ve_scenario1.rds",
                               variable_name = "inf_sample_age") + 
-           extract_variable(rds_file = "test_model_vcov_0.8_nsamp_20_lb_-0.25_ve_scenario1.rds", 
+           extract_variable(rds_file = "test_model_vcov_0.8_nsamp_50_lb_-0.25_ve_scenario1.rds", 
                             variable_name = "inf_sample_age_v")
 
 
@@ -417,6 +417,8 @@ v_vac_age_80 <- extract_variable(rds_file = "test_model_vcov_0.8_nsamp_20_lb_-0.
 
 matplot(t(v_vac_age_20[2,1,,]/total_pop_age[2,1,,]), type = "l")
 ```
+
+## age wise impact of vaccination
 ```{r}
 
 v_a = matrix( c(1,5,6,10,
@@ -432,12 +434,64 @@ v_a = matrix( c(1,5,6,10,
 
 
 
-get_agg_over_diff_age <- function(arr) {
+get_agg_over_diff_age <- function(arr, age_division) {
   
-  
-  arr_agg_age <- apply(arr, c(1,2,4), sum)
-  
-  return(arr_agg_age)
+  arr_targ_v_age <- array(NA, dim = c(n_vac_age,n_sample, n_vac_age, sim_year))
+
+
+for (i in 1:n_vac_age) {
+  for (j in 1:n_sample) {
+    for (k in 1:n_vac_age) {
+      for (l in 1:sim_year) {
+        
+      arr_targ_v_age[i,j,k,l] <- sum(arr[i,j,age_division[k,1]:age_division[k,2],l])
+      
+      }
 }
+}
+} 
+return(arr_targ_v_age)
+}
+
+
+nv_symp_age <- get_agg_over_diff_age(arr = nv_symp, age_division = v_a)  
+v_symp_20_age <- get_agg_over_diff_age(arr = v_symp_20, age_division = v_a)
+nv_symp_age_agg <- apply(nv_symp_age[, , ,10:30], c(1, 2,3), sum)
+v_symp_20_age_agg <- apply(v_symp_20_age[, , ,10:30], c(1, 2,3), sum)
+v_symp_20_avert <- 100*(nv_symp_age_agg - v_symp_20_age_agg)/nv_symp_age_agg
+
+v_symp_20_avert_mean <- apply(v_symp_20_avert, c(1,3), mean)
+
+
+# Load necessary libraries
+library(ggplot2)
+library(reshape2)
+
+# # Example matrix of 17 by 17 continuous data
+# set.seed(123)
+# mat <- matrix(runif(17 * 17, min = 0, max = 100), nrow = 17, ncol = 17)
+
+# Melt the matrix into a long format data frame
+df <- melt(v_symp_20_avert_mean)
+
+# Create heatmap using ggplot2
+ggplot(df, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white", size = 0.1) +  # Add white borders for separation
+  scale_fill_viridis_c(option = "B", name = "Value", direction = -1) +  # Use a visually appealing color gradient
+  theme_minimal(base_size = 15) +  # Increase base font size for better readability
+  labs(x = "Row", y = "Column", title = "Heatmap of Continuous Data") +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, color = "black", size = 12),
+    axis.text.y = element_text(color = "black", size = 12),
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    panel.grid.major = element_blank(),  # Remove gridlines
+    panel.grid.minor = element_blank(),
+    legend.position = "right",  # Position the legend on the right for clarity
+    legend.key.width = unit(1.5, "cm")  # Make the legend key wider for better visibility
+  )
+
+
+
+
 ```
 
