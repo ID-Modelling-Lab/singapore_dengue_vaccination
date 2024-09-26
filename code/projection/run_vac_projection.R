@@ -7,6 +7,7 @@ library(tidyr)
 library(here)
 library(foreach)
 library(doParallel)
+# library(doRNG)
 
 
 # will remove everything from workspace
@@ -72,213 +73,13 @@ death_mos = 1/10
 lambda_mos = death_mos 
 
 
-
-get_ve_point_estimate_from_trial <- function(df_efficacy) {
-  ## Filter the VE based on overall and serostatus stratified but serotype stratified
-  df_no_sero <- df_efficacy %>% filter(ve_against %in% 
-                                         c("vcd_overall", "hosp_overall", "vcd_sp", "vcd_sn", "hosp_sp", "hosp_sn"))
-  
-  ## create two groups based VCD and Hosp & Overall or serostatus stratified
-  
-  df_no_sero_strat <- df_no_sero %>% 
-    mutate( group1 = factor(case_when(
-      ve_against %in% c("vcd_overall", "vcd_sp", "vcd_sn") ~ "VCD",
-      ve_against %in% c("hosp_overall","hosp_sp", "hosp_sn") ~ "HOSPITALIZED"), 
-      levels = c("VCD", "HOSPITALIZED")),
-      
-      group2 = factor(case_when(
-        ve_against %in% c("vcd_overall", "hosp_overall") ~ "Overall",
-        ve_against %in% c("vcd_sp","hosp_sp") ~ "Sero+",
-        ve_against %in% c("vcd_sn","hosp_sn") ~ "Sero-"),
-        levels = c("Overall", "Sero+", "Sero-"))
-    )
-  
-  
-  ## Now first we remove the values where VE == 100 and replace with the previous and next values
-  ## Follow the same for the C.I values
-  ## There is only one such instance
-  # the value of ve which will replace ve==100
-  replace_ve_hosp_sn <- df_no_sero_strat %>%
-    filter(ve_against == "hosp_sn", month == 36) %>%
-    pull(ve)
-  
-  # the value of lower bound
-  replace_velow_hosp_sn <- df_no_sero_strat %>%
-    filter(ve_against == "hosp_sn", month == 36) %>%
-    pull(ve_low)
-  
-  # the value of upper bound
-  replace_veup_hosp_sn <- df_no_sero_strat %>%
-    filter(ve_against == "hosp_sn", month == 36) %>%
-    pull(ve_up)
-  
-  
-  # Modify the dataframe now replacing the VE==100 with above values
-  df_no_sero_strat <- df_no_sero_strat %>%
-    mutate(
-      ## Replace where VE value is 100 with the previous or next value
-      ve = ifelse(
-        group1 == "HOSPITALIZED" & group2 %in% c("Sero-") & ve == 100,
-        replace_ve_hosp_sn,
-        ve
-      ),
-      
-      ve_low = ifelse(
-        group1 == "HOSPITALIZED" &
-          group2 %in% c("Sero-") & is.na(ve_low) == TRUE,
-        replace_velow_hosp_sn,
-        ve_low
-      ),
-      
-      ve_up = ifelse(
-        group1 == "HOSPITALIZED" &
-          group2 %in% c("Sero-") & is.na(ve_up) == TRUE,
-        replace_veup_hosp_sn,
-        ve_up
-      )
-    )
-  
-  
-  ## Filter the VE based on serotypes
-  
-  df_sero <- df_efficacy %>%  filter(grepl("_dv[1234]$", ve_against))
-  
-  ## Create 3 groups
-  df_sero_strat <- df_sero %>%
-    mutate(
-      group1 = factor(case_when(
-        grepl("_dv1", ve_against, ignore.case = TRUE) ~ "DENV1",
-        grepl("_dv2", ve_against, ignore.case = TRUE) ~ "DENV2",
-        grepl("_dv3", ve_against, ignore.case = TRUE) ~ "DENV3",
-        grepl("_dv4", ve_against, ignore.case = TRUE) ~ "DENV4"),
-        levels = c("DENV1", "DENV2", "DENV3", "DENV4")),
-      
-      group2 = factor(case_when(
-        grepl("_sp_", ve_against, ignore.case = TRUE) ~ "Sero+",
-        grepl("_sn_", ve_against, ignore.case = TRUE) ~ "Sero-"),
-        levels = c("Sero+", "Sero-")),
-      
-      group3 = factor(case_when(
-        grepl("vcd_", ve_against, ignore.case = TRUE) ~ "VCD",
-        grepl("hosp_", ve_against, ignore.case = TRUE) ~ "Hospitalized"),
-        levels = c("VCD", "Hospitalized"))
-      
-    )
-  
-  ### Now from first data frame we will pull out the estimated of VE against HOSPITALIZED both for Sero+ and Sero-
-  # Sero+
-  pull_from_no_sero_ve_hosp_sp <- df_no_sero_strat %>%
-    filter(ve_against == "hosp_sp") %>%
-    pull(ve)
-  
-  pull_from_no_sero_velow_hosp_sp <- df_no_sero_strat %>%
-    filter(ve_against == "hosp_sp") %>%
-    pull(ve_low)
-  
-  pull_from_no_sero_veup_hosp_sp <- df_no_sero_strat %>%
-    filter(ve_against == "hosp_sp") %>%
-    pull(ve_up)
-  
-  # Sero- 
-  pull_from_no_sero_ve_hosp_sn <- df_no_sero_strat %>%
-    filter(ve_against == "hosp_sn") %>%
-    pull(ve)
-  
-  pull_from_no_sero_velow_hosp_sn <- df_no_sero_strat %>%
-    filter(ve_against == "hosp_sn") %>%
-    pull(ve_low)
-  
-  pull_from_no_sero_veup_hosp_sn <- df_no_sero_strat %>%
-    filter(ve_against == "hosp_sn") %>%
-    pull(ve_up)
-  
-  ## replace where the ve is 100 with next or previous values
-  # first instance
-  replace_ve_vcd_sp_dv4 <- df_sero_strat %>%
-    filter(ve_against == "vcd_sp_dv4", month == 36) %>%
-    pull(ve)
-  
-  replace_velow_vcd_sp_dv4 <- df_sero_strat %>%
-    filter(ve_against == "vcd_sp_dv4", month == 36) %>%
-    pull(ve_low)
-  
-  replace_veup_vcd_sp_dv4 <- df_sero_strat %>%
-    filter(ve_against == "vcd_sp_dv4", month == 36) %>%
-    pull(ve_up)
-  
-  # second instance
-  replace_ve_vcd_sn_dv2 <- df_sero_strat %>%
-    filter(ve_against == "vcd_sn_dv2", month == 24) %>%
-    pull(ve)
-  
-  replace_velow_vcd_sn_dv2 <- df_sero_strat %>%
-    filter(ve_against == "vcd_sn_dv2", month == 24) %>%
-    pull(ve_low)
-  
-  replace_veup_vcd_sn_dv2 <- df_sero_strat %>%
-    filter(ve_against == "vcd_sn_dv2", month == 24) %>%
-    pull(ve_up)
-  
-  # Modify df2 for hospitalization of DENV3 and DENV4 for sero+ and sero-
-  df_sero_strat <- df_sero_strat %>%
-    mutate(
-      
-      ## Ve against hosp for denv3 and denv4 both sero+ sero- are zero
-      ve = ifelse(group3 == "Hospitalized" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero+", "Sero-"), 0, ve),
-      ve_low = ifelse(group3 == "Hospitalized" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero+", "Sero-"), 0, ve_low),
-      ve_up = ifelse(group3 == "Hospitalized" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero+", "Sero-"), 0, ve_up),
-      
-      ## VE against VCD for DENV3 and DENV4 for Sero- are zero
-      ve = ifelse(group3 == "VCD" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero-"), 0, ve),
-      ve_low = ifelse(group3 == "VCD" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero-"), 0, ve_low),
-      ve_up = ifelse(group3 == "VCD" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero-"), 0, ve_up),
-      
-      ## Replace where VE value is 100 with the previous or next value
-      # first instance of VE == 100
-      ve = ifelse( group3 == "VCD" & group1 %in% c("DENV4") & group2 %in% c("Sero+") & ve == 100,
-                   replace_ve_vcd_sp_dv4, ve),
-      ve_low = ifelse( group3 == "VCD" & group1 %in% c("DENV4") & group2 %in% c("Sero+") & is.na(ve_low) == TRUE, 
-                       replace_velow_vcd_sp_dv4, ve_low),
-      ve_up = ifelse( group3 == "VCD" & group1 %in% c("DENV4") & group2 %in% c("Sero+") & is.na(ve_up) == TRUE,
-                      replace_veup_vcd_sp_dv4, ve_up),
-      
-      ## second instance of VE == 100    
-      ve = ifelse( group3 == "VCD" & group1 %in% c("DENV2") & group2 %in% c("Sero-") & ve == 100, 
-                   replace_ve_vcd_sn_dv2, ve),
-      ve_low = ifelse( group3 == "VCD" & group1 %in% c("DENV2") & group2 %in% c("Sero-") & is.na(ve_low) == TRUE,
-                       replace_velow_vcd_sn_dv2, ve_low),
-      ve_up = ifelse( group3 == "VCD" & group1 %in% c("DENV2") & group2 %in% c("Sero-") & is.na(ve_up) == TRUE, 
-                      replace_veup_vcd_sn_dv2, ve_up),
-      
-      # Replace hospitalized VE from the unstratified ve estimate
-      # seropositive
-      ve = ifelse( group3 == "Hospitalized" & group1 %in% c("DENV1", "DENV2") & group2 %in% c("Sero+") ,
-                   pull_from_no_sero_ve_hosp_sp, ve),
-      ve_low = ifelse( group3 == "Hospitalized" & group1 %in% c("DENV1","DENV2") & group2 %in% c("Sero+") ,
-                       pull_from_no_sero_velow_hosp_sp, ve_low),
-      ve_up = ifelse( group3 == "Hospitalized" & group1 %in% c("DENV1","DENV2") & group2 %in% c("Sero+") ,
-                      pull_from_no_sero_veup_hosp_sp, ve_up),
-      
-      # Seronegative
-      ve = ifelse( group3 == "Hospitalized" & group1 %in% c("DENV1", "DENV2") & group2 %in% c("Sero-"),
-                   pull_from_no_sero_ve_hosp_sn, ve),
-      ve_low = ifelse( group3 == "Hospitalized" & group1 %in% c("DENV1","DENV2") & group2 %in% c("Sero-") ,
-                       pull_from_no_sero_velow_hosp_sn, ve_low),
-      ve_up = ifelse( group3 == "Hospitalized" & group1 %in% c("DENV1","DENV2") & group2 %in% c("Sero-") , 
-                      pull_from_no_sero_veup_hosp_sn, ve_up)
-    )
-  
-  return(df_sero_strat)
-}
-
-
-
-
 ## Vaccine related paramter
 get_ve_from_trial <- function(df_efficacy) {
   ## Filter the VE based on overall and serostatus stratified but serotype stratified
   df_no_sero <- df_efficacy %>% filter(ve_against %in% 
-                                         c("vcd_overall", "hosp_overall", "vcd_sp", "vcd_sn", "hosp_sp", "hosp_sn"))
+                                         c("vcd_overall", "hosp_overall", 
+                                           "vcd_sp", "vcd_sn", 
+                                           "hosp_sp", "hosp_sn"))
   
   ## create two groups based VCD and Hosp & Overall or serostatus stratified
   
@@ -367,8 +168,9 @@ get_ve_from_trial <- function(df_efficacy) {
       
     )
   
-  ### Now from first data frame we will pull out the estimated of VE against HOSPITALIZED both for Sero+ and Sero-
-  # Sero+
+  ### Now from first data frame we will pull out the estimated of 
+  ## VE against HOSPITALIZED both for Sero+ and Sero- & Sero+
+  
   pull_from_no_sero_ve_hosp_sp <- df_no_sero_strat %>%
     filter(ve_against == "hosp_sp") %>%
     pull(ve)
@@ -425,15 +227,17 @@ get_ve_from_trial <- function(df_efficacy) {
   df_sero_strat <- df_sero_strat %>%
     mutate(
       
-      ## Ve against hosp for denv3 and denv4 both sero+ sero- are zero
-      ve = ifelse(group3 == "Hospitalized" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero+", "Sero-"), 0, ve),
-      ve_low = ifelse(group3 == "Hospitalized" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero+", "Sero-"), 0, ve_low),
-      ve_up = ifelse(group3 == "Hospitalized" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero+", "Sero-"), 0, ve_up),
       
-      ## VE against VCD for DENV3 and DENV4 for Sero- are zero
-      ve = ifelse(group3 == "VCD" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero-"), 0, ve),
-      ve_low = ifelse(group3 == "VCD" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero-"), 0, ve_low),
-      ve_up = ifelse(group3 == "VCD" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero-"), 0, ve_up),
+      
+      # ## Ve against hosp for denv3 and denv4 both sero+ sero- are zero
+      # ve = ifelse(group3 == "Hospitalized" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero+", "Sero-"), ve_hosp_dv_3_dv_4_sero_p_sero_n, ve),
+      # ve_low = ifelse(group3 == "Hospitalized" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero+", "Sero-"), ve_hosp_dv_3_dv_4_sero_p_sero_n, ve_low),
+      # ve_up = ifelse(group3 == "Hospitalized" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero+", "Sero-"), ve_hosp_dv_3_dv_4_sero_p_sero_n, ve_up),
+      # 
+      # ## VE against VCD for DENV3 and DENV4 for Sero- are zero
+      # ve = ifelse(group3 == "VCD" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero-"), ve_vcd_dv_3_dv_4_sero_n, ve),
+      # ve_low = ifelse(group3 == "VCD" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero-"), ve_vcd_dv_3_dv_4_sero_n, ve_low),
+      # ve_up = ifelse(group3 == "VCD" & group1 %in% c("DENV3", "DENV4") & group2 %in% c("Sero-"), ve_vcd_dv_3_dv_4_sero_n, ve_up),
       
       ## Replace where VE value is 100 with the previous or next value
       # first instance of VE == 100
@@ -505,14 +309,25 @@ get_ve_recursive <- function(df_efficacy,
 
 
 
-get_conditional_ve <- function(df_efficacy, n_vac_stage,
+get_conditional_ve_interval <- function(df_efficacy, n_vac_stage,
                                n_sero, lower_bound) {
   
   month_list <- unique(df_efficacy$month)
   sero_list <- c("DENV1","DENV2", "DENV3", "DENV4")
   
-  effi_inf_sero_n_array <- rep(0, n_vac_stage)
-  effi_inf_sero_p_array <- rep(0, n_vac_stage)
+  
+  
+  inf_low_sero_n <- array(NA, dim = c(n_vac_stage))
+  inf_up_sero_n <- array(NA, dim = c(n_vac_stage))
+  effi_inf_sero_n_array <- array(NA, dim = c(n_vac_stage))
+  
+  
+  
+  inf_low_sero_p <- array(NA, dim = c(n_vac_stage))
+  inf_up_sero_p <- array(NA, dim = c(n_vac_stage))
+  effi_inf_sero_p_array <- array(NA, dim=c(n_vac_stage))
+  
+  
   
   symp_low_sero_n <- array(NA, dim=c(n_vac_stage, n_sero))
   symp_up_sero_n <- array(NA, dim=c(n_vac_stage, n_sero))
@@ -526,104 +341,266 @@ get_conditional_ve <- function(df_efficacy, n_vac_stage,
   hosp_up_sero_n <- array(NA, dim=c(n_vac_stage, n_sero))
   effi_hosp_sero_n_array <- array(NA, dim=c(n_vac_stage, n_sero))
   
+  
   hosp_low_sero_p <- array(NA, dim=c(n_vac_stage, n_sero))
   hosp_up_sero_p <- array(NA, dim=c(n_vac_stage, n_sero))
   effi_hosp_sero_p_array <- array(NA, dim=c(n_vac_stage, n_sero))
   
-  
-  
-  for (i in 1:n_vac_stage) {
-    for (j in 1:n_sero) {
+    
+    for (i in 1:n_vac_stage) {
       
-      # symptomatic
-      symp_low_sero_n[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
-                                                       serotype = sero_list[j],
-                                                       sero_status = "Sero-",
-                                                       ve_against = "VCD",
-                                                       month = month_list[i])$ve_low
+      inf_low_sero_n[i] <- ve_inf_sero_n_low
+      inf_up_sero_n[i] <- ve_inf_sero_n_up
+      effi_inf_sero_n_array[i] <- runif(n=1,
+                                        min = inf_low_sero_n[i],
+                                        max = inf_up_sero_n[i])
       
-      
-      
-      symp_up_sero_n[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
-                                                      serotype = sero_list[j],
-                                                      sero_status = "Sero-",
-                                                      ve_against = "VCD",
-                                                      month = month_list[i])$ve_up
-      
-      symp_low_sero_p[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
-                                                       serotype = sero_list[j],
-                                                       sero_status = "Sero+",
-                                                       ve_against = "VCD",
-                                                       month = month_list[i])$ve_low
-      
-      symp_up_sero_p[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
-                                                      serotype = sero_list[j],
-                                                      sero_status = "Sero+",
-                                                      ve_against = "VCD",
-                                                      month = month_list[i])$ve_up
-      # hospitalized
-      hosp_low_sero_n[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
-                                                       serotype = sero_list[j],
-                                                       sero_status = "Sero-",
-                                                       ve_against = "Hospitalized",
-                                                       month = month_list[i])$ve_low
-      
-      hosp_up_sero_n[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
-                                                      serotype = sero_list[j],
-                                                      sero_status = "Sero-",
-                                                      ve_against = "Hospitalized",
-                                                      month = month_list[i])$ve_up
-      
-      hosp_low_sero_p[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
-                                                       serotype = sero_list[j],
-                                                       sero_status = "Sero+",
-                                                       ve_against = "Hospitalized",
-                                                       month = month_list[i])$ve_low
-      
-      hosp_up_sero_p[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
-                                                      serotype = sero_list[j],
-                                                      sero_status = "Sero+",
-                                                      ve_against = "Hospitalized",
-                                                      month = month_list[i])$ve_up
+      inf_low_sero_p[i] <- ve_inf_sero_p_low
+      inf_up_sero_p[i] <- ve_inf_sero_p_up
+      effi_inf_sero_p_array[i] <- runif(n=1,
+                                        min = inf_low_sero_p[i],
+                                        max = inf_up_sero_p[i])
       
       
-      if (j==3|j==4) {
-        effi_symp_sero_n_array[i,j] <- 0
+      for (j in 1:n_sero) {
+        
+        # symptomatic
+        symp_low_sero_n[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
+                                                         serotype = sero_list[j],
+                                                         sero_status = "Sero-",
+                                                         ve_against = "VCD",
+                                                         month = month_list[i])$ve_low
+        
+        symp_up_sero_n[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
+                                                        serotype = sero_list[j],
+                                                        sero_status = "Sero-",
+                                                        ve_against = "VCD",
+                                                        month = month_list[i])$ve_up
+        
+        symp_low_sero_p[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
+                                                         serotype = sero_list[j],
+                                                         sero_status = "Sero+",
+                                                         ve_against = "VCD",
+                                                         month = month_list[i])$ve_low
+        
+        symp_up_sero_p[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
+                                                        serotype = sero_list[j],
+                                                        sero_status = "Sero+",
+                                                        ve_against = "VCD",
+                                                        month = month_list[i])$ve_up
+        # hospitalized
+        hosp_low_sero_n[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
+                                                         serotype = sero_list[j],
+                                                         sero_status = "Sero-",
+                                                         ve_against = "Hospitalized",
+                                                         month = month_list[i])$ve_low
+        
+        hosp_up_sero_n[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
+                                                        serotype = sero_list[j],
+                                                        sero_status = "Sero-",
+                                                        ve_against = "Hospitalized",
+                                                        month = month_list[i])$ve_up
+        
+        hosp_low_sero_p[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
+                                                         serotype = sero_list[j],
+                                                         sero_status = "Sero+",
+                                                         ve_against = "Hospitalized",
+                                                         month = month_list[i])$ve_low
+        
+        hosp_up_sero_p[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
+                                                        serotype = sero_list[j],
+                                                        sero_status = "Sero+",
+                                                        ve_against = "Hospitalized",
+                                                        month = month_list[i])$ve_up
+        
+        
+        ## effi vcd seronegative
+        
+        if (j==3 | j==4) {
+          samp_effi_symp_n <-  ve_vcd_dv_3_dv_4_sero_n
+          effi_symp_sero_n_array[i,j] <- samp_effi_symp_n 
+        } else {
+          
+          samp_effi_symp_n <- runif(n = 1, 
+                                    min = symp_low_sero_n[i,j],
+                                    max = symp_up_sero_n[i,j] )
+          
+          
+          effi_symp_sero_n_array[i,j] <- max( lower_bound, ( samp_effi_symp_n - effi_inf_sero_n_array[i])/(1 - effi_inf_sero_n_array[i]) )
+          
+        }
+        
+        
+        ## effi vcd seropositive
+        samp_effi_symp_p <- runif(n = 1, 
+                                  min = symp_low_sero_p[i,j] ,
+                                  max = symp_up_sero_p[i,j] )
+        
+        
+        
+        effi_symp_sero_p_array[i,j] <- max(lower_bound, (samp_effi_symp_p - effi_inf_sero_p_array[i])/(1 - effi_inf_sero_p_array[i]) )
+        
+        
+        ### effi hosp seronegative
+        
+        if (j==3 | j==4) {
+          
+          samp_effi_hosp_n <- ve_hosp_dv_3_dv_4_sero_p_sero_n
+          effi_hosp_sero_n_array[i,j] <-  samp_effi_hosp_n
+          
+        } else {
+          
+          samp_effi_hosp_n <- runif(n = 1, 
+                                    min = hosp_low_sero_n[i,j] ,
+                                    max = hosp_up_sero_n[i,j] )
+          effi_hosp_sero_n_array[i,j] <- max(lower_bound, ( samp_effi_hosp_n -    samp_effi_symp_n )/(1 -   samp_effi_symp_n) )
+        }
+        
+        
+        ### effi hosp seropositive 
+        
+        if (j==3 | j==4) {
+          
+          samp_effi_hosp_p <- ve_hosp_dv_3_dv_4_sero_p_sero_n
+          effi_hosp_sero_p_array[i,j] <-  samp_effi_hosp_p
+          
+        } else {
+          
+          samp_effi_hosp_p <- runif(n = 1, 
+                                    min = hosp_low_sero_p[i,j] ,
+                                    max = hosp_up_sero_p[i,j] )
+          effi_hosp_sero_p_array[i,j] <- max(lower_bound, ( samp_effi_hosp_p -    samp_effi_symp_p )/(1 -   samp_effi_symp_p) )
+        }
+        
+       
+        
       }
-      
-      else {
-        effi_symp_sero_n_array[i,j] <-  runif(n = 1, min = max(lower_bound,symp_low_sero_n[i,j]) , max = symp_up_sero_n[i,j] )
-        # 1 - ((1 - runif(n = 1, 
-        #                                                min = symp_low_sero_n[i,j] , 
-        #                                                max = symp_up_sero_n[i,j] ) )/(1 - effi_inf_sero_n_array[i]))
-      }
-      
-      
-      effi_symp_sero_p_array[i,j] <- runif(n = 1, min = max(lower_bound,symp_low_sero_p[i,j]), max = symp_up_sero_p[i,j] )
-      
-      
-      
-      if (j==3|j==4) {
-        effi_hosp_sero_n_array[i,j] <- 0
-      }
-      
-      else {
-        effi_hosp_sero_n_array[i,j] <- max(lower_bound, 1 - ((1 - runif(n = 1, 
-                                                                        min = max(lower_bound,hosp_low_sero_n[i,j]) , 
-                                                                        max = hosp_up_sero_n[i,j] ) )/(1 - effi_symp_sero_n_array[i,j])) )
-      }
-      
-      if (j==3|j==4) {
-        effi_hosp_sero_p_array[i,j] <- 0
-      }
-      else {
-        effi_hosp_sero_p_array[i,j] <-  max(lower_bound, 1 - ((1 - runif(n = 1, 
-                                                                         min = max(lower_bound,hosp_low_sero_p[i,j]) , 
-                                                                         max = hosp_up_sero_p[i,j] ) )/(1 - effi_symp_sero_p_array[i,j])) )
-      }
-      
       
     }
+    
+    
+
+        
+        
+        
+       
+    
+    
+
+  
+  return(list(inf_n = effi_inf_sero_n_array, 
+              inf_p = effi_inf_sero_p_array,
+              symp_n = effi_symp_sero_n_array, 
+              symp_p = effi_symp_sero_p_array,
+              hos_n = effi_hosp_sero_n_array, 
+              hos_p = effi_hosp_sero_p_array))
+  
+}
+
+
+#####
+
+
+get_conditional_ve_point <- function(df_efficacy, n_vac_stage,
+                                        n_sero) {
+  
+  month_list <- unique(df_efficacy$month)
+  sero_list <- c("DENV1","DENV2", "DENV3", "DENV4")
+  
+  
+  inf_pt_sero_n <- array(NA, dim = c(n_vac_stage))
+  effi_inf_sero_n_array <- array(NA, dim = c(n_vac_stage))
+  
+  inf_pt_sero_p <- array(NA, dim = c(n_vac_stage))
+  effi_inf_sero_p_array <- array(NA, dim=c(n_vac_stage))
+  
+  symp_pt_sero_n <- array(NA, dim=c(n_vac_stage, n_sero))
+  effi_symp_sero_n_array <- array(NA, dim=c(n_vac_stage, n_sero))
+  
+  symp_pt_sero_p <- array(NA, dim=c(n_vac_stage, n_sero))
+  effi_symp_sero_p_array <- array(NA, dim=c(n_vac_stage, n_sero))
+
+  hosp_pt_sero_n <- array(NA, dim=c(n_vac_stage, n_sero))
+  effi_hosp_sero_n_array <- array(NA, dim=c(n_vac_stage, n_sero))
+  
+  hosp_pt_sero_p <- array(NA, dim=c(n_vac_stage, n_sero))
+  effi_hosp_sero_p_array <- array(NA, dim=c(n_vac_stage, n_sero))
+  
+  
+    
+    
+    for (i in 1:n_vac_stage) {
+      
+      effi_inf_sero_n_array[i] <- ve_inf_sero_n_pt 
+      effi_inf_sero_p_array[i] <- ve_inf_sero_p_pt 
+      
+      
+      for (j in 1:n_sero) {
+        
+        # symptomatic
+        symp_pt_sero_n[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
+                                                        serotype = sero_list[j],
+                                                        sero_status = "Sero-",
+                                                        ve_against = "VCD",
+                                                        month = month_list[i])$ve
+        
+        symp_pt_sero_p[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
+                                                        serotype = sero_list[j],
+                                                        sero_status = "Sero+",
+                                                        ve_against = "VCD",
+                                                        month = month_list[i])$ve
+        # hospitalized
+        hosp_pt_sero_n[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
+                                                        serotype = sero_list[j],
+                                                        sero_status = "Sero-",
+                                                        ve_against = "Hospitalized",
+                                                        month = month_list[i])$ve
+        
+        hosp_pt_sero_p[i,j] <- (1/100)*get_ve_recursive(df_efficacy = df_efficacy,
+                                                        serotype = sero_list[j],
+                                                        sero_status = "Sero+",
+                                                        ve_against = "Hospitalized",
+                                                        month = month_list[i])$ve
+        
+        
+        
+        if (j==3 | j==4) {
+          
+          effi_symp_sero_n_array[i,j] <-  ve_vcd_dv_3_dv_4_sero_n
+          
+        } else {
+          
+          effi_symp_sero_n_array[i,j] <- (symp_pt_sero_n[i,j] - effi_inf_sero_n_array[i])/(1 - effi_inf_sero_n_array[i])
+          
+        }
+        
+        
+        effi_symp_sero_p_array[i,j] <-  (symp_pt_sero_p[i,j]  - effi_inf_sero_p_array[i])/(1 - effi_inf_sero_p_array[i]) 
+        
+        
+        if (j==3 | j==4) {
+          
+          effi_hosp_sero_n_array[i,j] <-  ve_hosp_dv_3_dv_4_sero_p_sero_n 
+          
+        } else {
+          
+          effi_hosp_sero_n_array[i,j] <- (hosp_pt_sero_n[i,j] - symp_pt_sero_n[i])/(1 - symp_pt_sero_n[i])
+          
+        }
+        
+        
+        if (j==3 | j==4) {
+          
+          effi_hosp_sero_p_array[i,j] <-  ve_hosp_dv_3_dv_4_sero_p_sero_n 
+          
+        } else {
+          
+          effi_hosp_sero_p_array[i,j] <- (hosp_pt_sero_p[i,j] - symp_pt_sero_p[i])/(1 - symp_pt_sero_p[i])
+          
+        }
+  
+    }
+    
     
   }
   
@@ -640,23 +617,24 @@ get_conditional_ve <- function(df_efficacy, n_vac_stage,
 
 
 
-
-
-
-
-
+###############################################################################
 
 
 
 ## Number of serotype
 n_sero <- 4
-## read the excel of efficacy of qdenga data
 
+### Assumption on hosp and vcd for denv3 and denv4
+
+
+####################      CHECK POINT 1    ###########################
+
+## Warning: should be in decimal
+ve_hosp_dv_3_dv_4_sero_p_sero_n = 0
+ve_vcd_dv_3_dv_4_sero_n = 0
+## read the excel of efficacy of qdenga data
 data_efficacy = read_xlsx( here("data","qdenga_efficacy.xlsx"), 
                            sheet = "Sheet1" )
-
-
-# data_efficacy <- read_xlsx("~/codes/dengue_main/data/qdenga_efficacy.xlsx",sheet="Sheet1")
 ##
 sero_strat_ve <- get_ve_from_trial(df_efficacy = data_efficacy )
 n_vac_stage <- length(unique(sero_strat_ve$month))
@@ -664,6 +642,17 @@ n_vac_stage <- length(unique(sero_strat_ve$month))
 
 vac_stage_rate <- c( rep(1/(12*30),3), 0)
 
+
+
+### efficacy against infection WARNING : Should be in decimal
+ve_inf_sero_n_low = 0
+ve_inf_sero_n_up = 0
+ve_inf_sero_n_pt = 0
+ve_inf_sero_p_low = 0
+ve_inf_sero_p_up = 0
+ve_inf_sero_p_pt = 0
+
+################################################################################
 
 
 
@@ -802,38 +791,34 @@ sigma_m = 1/10
 
 
 
+#############################  CHECK POINT 2 ################################
+
 ## sampling from posterior
 n_sample <- 20
+
 post <- readRDS(here("model_output", "posterior_rep_rate.rds"))
 
-sampled_row <- sample(1:nrow(post), n_sample)
 
-rho_2_sample <- post[sampled_row,]
+get_post_sample <- function() {
 
-
-get_post_sample <- function(k) {
   
-  rho_2_a1 = rho_2_sample[k,1]
-  rho_2_a2 = rho_2_sample[k,2]
-  rho_2_a3 = rho_2_sample[k,3]
-  rho_2_a4 = rho_2_sample[k,4]
-  rho_2_a5 = rho_2_sample[k,5]
-  rho_2_a6 = rho_2_sample[k,6]
-  rho_2_a7 = rho_2_sample[k,7]
-  rho_2_a8 = rho_2_sample[k,8]
+  sampled_row <- sample(1:nrow(post),1)
   
-  rho_2 <- rep(NA, n_age)
+  rho_2_sample <- post[sampled_row,]
   
-  rho_2[1:5] <- rho_2_a1
-  rho_2[6:15] <- rho_2_a2
-  rho_2[16:25] <- rho_2_a3
-  rho_2[26:35] <- rho_2_a4
-  rho_2[36:45] <- rho_2_a5
-  rho_2[46:55] <- rho_2_a6
-  rho_2[56:65] <- rho_2_a7
-  rho_2[66:91] <- rho_2_a8
   
-  return(list(rho_2 = rho_2))
+  rho_2 <- array(NA, dim=c(n_age))
+  
+  rho_2[1:5] <- rho_2_sample[1]
+  rho_2[6:15] <- rho_2_sample[2]
+  rho_2[16:25] <- rho_2_sample[3]
+  rho_2[26:35] <- rho_2_sample[4]
+  rho_2[36:45] <- rho_2_sample[5]
+  rho_2[46:55] <- rho_2_sample[6]
+  rho_2[56:65] <- rho_2_sample[7]
+  rho_2[66:91] <- rho_2_sample[8]
+  
+  return(list(rho_2_samp = rho_2))
 }
 
 
@@ -850,7 +835,7 @@ out_vaccine = function(par) {
                                                        step_size_min = 1e-14,
                                                        debug_record_step_times = TRUE))
   
-  # print(1)
+
   ## simulate the model
   out <- model$simulate(t)
   
@@ -883,9 +868,11 @@ out_vaccine = function(par) {
   ## incidence of infection
   inf_age_sero <- array(out[ind_inf,,], dim = c(n_age, n_sero, length(t)))  ## for unvaccinated
   inf_age_yearly <- calc_year_age(inf_age_sero)                             ## make this yearly
+  inf_sero_yearly <- calc_year_sero(inf_age_sero)  ## serotype wise infection
   
   inf_age_sero_v <- array(out[ind_inf_v,,], dim = c(n_age, n_sero, length(t))) ## for vaccinated
   inf_age_v_yearly <- calc_year_age(inf_age_sero_v)                            ## yearly
+  inf_sero_v_yearly <- calc_year_sero(inf_age_sero_v)  ## serotype wise infection
   
   ## incidence of symptomatic cases
   symp_age_sero <- array(out[ind_symp,,], dim = c(n_age, n_sero,length(t)))
@@ -911,6 +898,8 @@ out_vaccine = function(par) {
               tot_pop_age_nv = tot_pop_age_nv_yearly,
               inf_age = inf_age_yearly,
               inf_age_v = inf_age_v_yearly,
+              inf_sero = inf_sero_yearly,
+              inf_sero_v = inf_sero_v_yearly,
               symp_age = symp_age_yearly,
               symp_age_v = symp_age_v_yearly,
               hosp_age = hosp_age_yearly,
@@ -919,23 +908,29 @@ out_vaccine = function(par) {
   ))
 }
 
+##################  CHECK POINT 3 ###########################
 
-
-### nested looping starts here
 
 # Define the number of cores to use
 numcores <- 5 # detectCores() - 1  
-
 cl <- makeCluster(numcores)  # Adjust the number of cores based on your HPC setup
 registerDoParallel(cl)
 
-# 
-# registerDoParallel(numCores)
+### nested looping starts here
 
 
-## Coverage values
-v_coverage = 0.0
 
+## Coverage values should not be zero, for baseine the efficacy should be zero
+v_coverage = 0.2
+
+### Warning Should be in decimal
+lower_bound <- 0.0  ## lower bound of negative efficacy 
+run_type = "interval"  ## sample from interval, and if "point" then with point estimates
+baseline = "yes"
+
+
+v_year <- 15
+vac_start <- v_year*365  ## year of vaccination start
 
 ## indices for vaccinated age-groups
 v_a = matrix( c(1,5,6,10,
@@ -959,6 +954,9 @@ n_vac_age = dim(v_a)[1]
 inf_sample_age = array(NA, dim = c(n_sample,n_age, sim_year))
 inf_sample_age_v = array(NA, dim = c(n_sample,n_age, sim_year))
 
+inf_sample_sero = array(NA, dim = c(n_sample,n_sero, sim_year))
+inf_sample_sero_v = array(NA, dim = c(n_sample,n_sero, sim_year))
+
 symp_sample_age = array(NA, dim = c(n_sample,n_age, sim_year))
 symp_sample_age_v = array(NA, dim = c(n_sample,n_age, sim_year))
 
@@ -972,20 +970,23 @@ new_vac_sample_age =  array(NA, dim = c(n_sample, n_age,sim_year))
 
 
 ### save all the sampled efficacy estimates
-
+effi_inf_sero_n_sample = array(NA, dim = c(n_sample, n_vac_stage))
+effi_inf_sero_p_sample = array(NA, dim = c(n_sample, n_vac_stage))
 effi_symp_sero_n_sample = array(NA, dim = c(n_sample, n_vac_stage, n_sero))
 effi_symp_sero_p_sample = array(NA, dim = c(n_sample, n_vac_stage, n_sero))
 effi_hos_sero_n_sample = array(NA, dim = c(n_sample, n_vac_stage, n_sero))
 effi_hos_sero_p_sample = array(NA, dim = c(n_sample, n_vac_stage, n_sero))
 
+
+# rho_2_sample = array(NA, dim=c(n_sample, n_age))
+
+
+### allocate space for output 
 results_list <- vector("list", length(v_coverage))
 
 ## Run for different vaccination coverage and for different targeted age-groups
 ## Looping over coverage (i), vaccinated age groups (j), sample(k)
 
-v_year <- 10
-vac_start <- v_year*365  ## year of vaccination start
-lower_bound <- -0.25  ## lower bound of negative efficacy 
 
 
 ### Run in parallel
@@ -994,11 +995,13 @@ lower_bound <- -0.25  ## lower bound of negative efficacy
 
 ### make vaccinated age group run in parallel
 for (i in 1:length(v_coverage)) {
-  set.seed(12345)
+   
   vac_coverage <- v_coverage[i]
   # print(i)
-  
+
   out_parallel <- foreach(j =  1:n_vac_age, .combine = rbind, .packages = c("dplyr", "tidyr", "here", "odin.dust")) %dopar% {
+   
+    set.seed(12345)
     
     library(dplyr)
     library(tidyr)
@@ -1010,46 +1013,71 @@ for (i in 1:length(v_coverage)) {
     vac_switch[v_a[j,1]:v_a[j,2]] <- 1
     
     for (k in 1:n_sample) {
-      print(k)
       
-      if (vac_coverage == 0.0) {
-        effi_inf_sero_n = array(0, dim=c(n_vac_stage))
-        effi_inf_sero_p = array(0, dim=c(n_vac_stage))
-        effi_symp_sero_n = array(0, dim=c(n_vac_stage, n_sero))
-        effi_symp_sero_p = array(0, dim=c(n_vac_stage, n_sero))
-        effi_hos_sero_n = array(0, dim=c(n_vac_stage, n_sero))
-        effi_hos_sero_p = array(0, dim=c(n_vac_stage, n_sero))
-        
-        
-      }
+      ratio_p_s <- 1/2
       
-      else {
+      rho_2 <- get_post_sample()$rho_2_samp
+      rho_1 <- ratio_p_s*rho_2
+      # rho_2_sample[k,] = rho_2
       
       
-      v_eff <- get_conditional_ve(df_efficacy = sero_strat_ve, 
+      
+      v_eff_interval <- get_conditional_ve_interval(df_efficacy = sero_strat_ve, 
                                   n_vac_stage = n_vac_stage , 
                                   n_sero = n_sero, lower_bound = lower_bound
                                   )
-      effi_inf_sero_n = v_eff$inf_n
-      effi_inf_sero_p = v_eff$inf_p
-      effi_symp_sero_n = v_eff$symp_n
-      effi_symp_sero_p = v_eff$symp_p
-      effi_hos_sero_n = v_eff$hos_n
-      effi_hos_sero_p = v_eff$hos_p
+      
+      v_eff_point <- get_conditional_ve_point(df_efficacy = sero_strat_ve, 
+                                                    n_vac_stage = n_vac_stage , 
+                                                    n_sero = n_sero
+      )
+      
+      
+      
+      if (baseline == "yes") {
+        
+        effi_inf_sero_n = 0*v_eff_point$inf_n
+        effi_inf_sero_p = 0*v_eff_point$inf_p
+        effi_symp_sero_n = 0*v_eff_point$symp_n
+        effi_symp_sero_p = 0*v_eff_point$symp_p
+        effi_hos_sero_n = 0*v_eff_point$hos_n
+        effi_hos_sero_p = 0*v_eff_point$hos_p
+        
+      } else if (baseline == "no") {
+        
+        if (run_type == "interval") {
+          
+          effi_inf_sero_n = v_eff_interval$inf_n
+          effi_inf_sero_p = v_eff_interval$inf_p
+          effi_symp_sero_n = v_eff_interval$symp_n
+          effi_symp_sero_p = v_eff_interval$symp_p
+          effi_hos_sero_n = v_eff_interval$hos_n
+          effi_hos_sero_p = v_eff_interval$hos_p
+          
+        } else if (run_type == "point") {
+           
+          effi_inf_sero_n = v_eff_point$inf_n
+          effi_inf_sero_p = v_eff_point$inf_p
+          effi_symp_sero_n = v_eff_point$symp_n
+          effi_symp_sero_p = v_eff_point$symp_p
+          effi_hos_sero_n = v_eff_point$hos_n
+          effi_hos_sero_p = v_eff_point$hos_p
+          
+        }
+        
+        
       }
       
+     
       
-      
-      
+      effi_inf_sero_n_sample[k,] = effi_inf_sero_n
+      effi_inf_sero_p_sample[k,] = effi_inf_sero_p
       effi_symp_sero_n_sample[k,,] = effi_symp_sero_n
       effi_symp_sero_p_sample[k,,] = effi_symp_sero_p
       effi_hos_sero_n_sample[k,,] = effi_hos_sero_n
       effi_hos_sero_p_sample[k,,] = effi_hos_sero_p
       
-      ratio_p_s <- 1/2
-      
-      rho_2 <- get_post_sample(k)$rho_2
-      rho_1 <- ratio_p_s*rho_2
+   
       
       par <- list(
         n_age = n_age,
@@ -1113,6 +1141,9 @@ for (i in 1:length(v_coverage)) {
       inf_sample_age[k,,] <- xx$inf_age
       inf_sample_age_v[k,,] <- xx$inf_age_v
       
+      inf_sample_sero[k,,] = xx$inf_sero #array(NA, dim = c(n_sample,n_sero, sim_year))
+      inf_sample_sero_v[k,,] = xx$inf_sero_v # array(NA, dim = c(n_sample,n_sero, sim_year))
+      
       symp_sample_age[k,,] <- xx$symp_age
       symp_sample_age_v[k,,] <- xx$symp_age_v
       
@@ -1128,12 +1159,17 @@ for (i in 1:length(v_coverage)) {
                 tot_pop_sample_age_nv = tot_pop_sample_age_nv,
                 inf_sample_age = inf_sample_age,
                 inf_sample_age_v = inf_sample_age_v,
+                inf_sample_sero = inf_sample_sero,
+                inf_sample_sero_v = inf_sample_sero_v,
                 symp_sample_age = symp_sample_age,
                 symp_sample_age_v = symp_sample_age_v,
                 hosp_sample_age = hosp_sample_age,
                 hosp_sample_age_v = hosp_sample_age_v,
                 new_vac_sample_age = new_vac_sample_age,
+                # rho_2_sample = rho_2_sample,
                 eff = list(
+                  effi_inf_sero_n = effi_inf_sero_n_sample,
+                  effi_inf_sero_p = effi_inf_sero_p_sample,
                   effi_symp_sero_n = effi_symp_sero_n_sample,
                   effi_symp_sero_p = effi_symp_sero_p_sample,
                   effi_hosp_sero_n = effi_hos_sero_n_sample,
@@ -1151,6 +1187,9 @@ for (i in 1:length(v_coverage)) {
 
 
 ## TO add v_a in the output list also start of vaccination year
+
+if (run_type == "interval") {
+
 saveRDS(list(coverage = v_coverage, 
              n_sample = n_sample,
              n_sero = n_sero,
@@ -1158,11 +1197,28 @@ saveRDS(list(coverage = v_coverage,
              n_vac_age = n_vac_age,
              n_age = n_age,
              v_year = v_year,
-             
+             v_age_list = v_a,
+             lower_bound = lower_bound,
              output=results_list), 
-        file = here::here("model_output", paste0("test_model_", "vcov_", v_coverage,
-                                                 "_nsamp_", n_sample,"_lb_", 
-                                                 lower_bound,"_ve_scenario1.rds" )))
+        file = here::here("model_output", paste0("t3run_", run_type, "_vcov_", v_coverage,
+                                                 "_nsamp_", n_sample,"_baseline_", baseline, "_lb_", 
+                                                 lower_bound,"_scen_dv34_zero.rds" )))
+  
+} else {
+  
+  saveRDS(list(coverage = v_coverage, 
+               n_sample = n_sample,
+               n_sero = n_sero,
+               n_year = sim_year,
+               n_vac_age = n_vac_age,
+               n_age = n_age,
+               v_year = v_year,
+               v_age_list = v_a,
+               output=results_list), 
+          file = here::here("model_output", paste0("t3run_", run_type, "_vcov_", v_coverage,"_baseline_", baseline,
+                                                   "_nsamp_", n_sample,".rds" )))
+}
+
 
 
 stopCluster(cl)
