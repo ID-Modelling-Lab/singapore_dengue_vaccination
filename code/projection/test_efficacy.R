@@ -589,7 +589,7 @@ data_efficacy = read_xlsx( here("data","qdenga_efficacy.xlsx"),
 sero_strat_ve <- get_ve_from_trial(df_efficacy = data_efficacy )
 n_vac_stage <- length(unique(sero_strat_ve$month))
 n_sero <- 4
-n_run <- 20
+n_run <- 200
 
 run_type= "interval"
 
@@ -607,7 +607,7 @@ ve_inf_sero_p_up = 0
 ve_inf_sero_p_pt = 0
 
 
-lower_bound = 0
+lower_bound = -Inf
 
 effi_symp_sero_n_sample = array(NA, dim = c(n_run, n_vac_stage, n_sero))
 effi_symp_sero_p_sample = array(NA, dim = c(n_run, n_vac_stage, n_sero))

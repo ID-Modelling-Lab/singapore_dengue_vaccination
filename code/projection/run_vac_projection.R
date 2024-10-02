@@ -325,26 +325,26 @@ get_conditional_ve_interval <- function(df_efficacy, n_vac_stage,
   
   inf_low_sero_p <- array(NA, dim = c(n_vac_stage))
   inf_up_sero_p <- array(NA, dim = c(n_vac_stage))
-  effi_inf_sero_p_array <- array(NA, dim=c(n_vac_stage))
+  effi_inf_sero_p_array <- array(NA, dim = c(n_vac_stage))
   
   
   
-  symp_low_sero_n <- array(NA, dim=c(n_vac_stage, n_sero))
-  symp_up_sero_n <- array(NA, dim=c(n_vac_stage, n_sero))
-  effi_symp_sero_n_array <- array(NA, dim=c(n_vac_stage, n_sero))
+  symp_low_sero_n <- array(NA, dim = c(n_vac_stage, n_sero))
+  symp_up_sero_n <- array(NA, dim = c(n_vac_stage, n_sero))
+  effi_symp_sero_n_array <- array(NA, dim = c(n_vac_stage, n_sero))
   
-  symp_low_sero_p <- array(NA, dim=c(n_vac_stage, n_sero))
-  symp_up_sero_p <- array(NA, dim=c(n_vac_stage, n_sero))
-  effi_symp_sero_p_array <- array(NA, dim=c(n_vac_stage, n_sero))
+  symp_low_sero_p <- array(NA, dim = c(n_vac_stage, n_sero))
+  symp_up_sero_p <- array(NA, dim = c(n_vac_stage, n_sero))
+  effi_symp_sero_p_array <- array(NA, dim = c(n_vac_stage, n_sero))
   
-  hosp_low_sero_n <- array(NA, dim=c(n_vac_stage, n_sero))
-  hosp_up_sero_n <- array(NA, dim=c(n_vac_stage, n_sero))
-  effi_hosp_sero_n_array <- array(NA, dim=c(n_vac_stage, n_sero))
+  hosp_low_sero_n <- array(NA, dim = c(n_vac_stage, n_sero))
+  hosp_up_sero_n <- array(NA, dim = c(n_vac_stage, n_sero))
+  effi_hosp_sero_n_array <- array(NA, dim = c(n_vac_stage, n_sero))
   
   
-  hosp_low_sero_p <- array(NA, dim=c(n_vac_stage, n_sero))
-  hosp_up_sero_p <- array(NA, dim=c(n_vac_stage, n_sero))
-  effi_hosp_sero_p_array <- array(NA, dim=c(n_vac_stage, n_sero))
+  hosp_low_sero_p <- array(NA, dim = c(n_vac_stage, n_sero))
+  hosp_up_sero_p <- array(NA, dim = c(n_vac_stage, n_sero))
+  effi_hosp_sero_p_array <- array(NA, dim = c(n_vac_stage, n_sero))
   
     
     for (i in 1:n_vac_stage) {
@@ -508,10 +508,10 @@ get_conditional_ve_point <- function(df_efficacy, n_vac_stage,
   sero_list <- c("DENV1","DENV2", "DENV3", "DENV4")
   
   
-  inf_pt_sero_n <- array(NA, dim = c(n_vac_stage))
+  # inf_pt_sero_n <- array(NA, dim = c(n_vac_stage))
   effi_inf_sero_n_array <- array(NA, dim = c(n_vac_stage))
   
-  inf_pt_sero_p <- array(NA, dim = c(n_vac_stage))
+  # inf_pt_sero_p <- array(NA, dim = c(n_vac_stage))
   effi_inf_sero_p_array <- array(NA, dim=c(n_vac_stage))
   
   symp_pt_sero_n <- array(NA, dim=c(n_vac_stage, n_sero))
@@ -630,8 +630,8 @@ n_sero <- 4
 ####################      CHECK POINT 1    ###########################
 
 ## Warning: should be in decimal
-ve_hosp_dv_3_dv_4_sero_p_sero_n = 0
-ve_vcd_dv_3_dv_4_sero_n = 0
+ve_hosp_dv_3_dv_4_sero_p_sero_n = 0.0
+ve_vcd_dv_3_dv_4_sero_n = 0.0
 ## read the excel of efficacy of qdenga data
 data_efficacy = read_xlsx( here("data","qdenga_efficacy.xlsx"), 
                            sheet = "Sheet1" )
@@ -645,12 +645,12 @@ vac_stage_rate <- c( rep(1/(12*30),3), 0)
 
 
 ### efficacy against infection WARNING : Should be in decimal
-ve_inf_sero_n_low = 0
-ve_inf_sero_n_up = 0
-ve_inf_sero_n_pt = 0
-ve_inf_sero_p_low = 0
-ve_inf_sero_p_up = 0
-ve_inf_sero_p_pt = 0
+ve_inf_sero_n_low = 0 # -0.359
+ve_inf_sero_n_up = 0 #0.388
+ve_inf_sero_n_pt = 0 #0.093
+ve_inf_sero_p_low =0 # 0.352
+ve_inf_sero_p_up = 0 #0.585
+ve_inf_sero_p_pt = 0 #0.481
 
 ################################################################################
 
@@ -921,28 +921,39 @@ registerDoParallel(cl)
 
 
 ## Coverage values should not be zero, for baseine the efficacy should be zero
-v_coverage = 0.2
+v_coverage = 0.8
 
 ### Warning Should be in decimal
 lower_bound <- 0.0  ## lower bound of negative efficacy 
 run_type = "interval"  ## sample from interval, and if "point" then with point estimates
-baseline = "yes"
+baseline = "yes" ## should 
 
 
 v_year <- 15
 vac_start <- v_year*365  ## year of vaccination start
 
 ## indices for vaccinated age-groups
-v_a = matrix( c(1,5,6,10,
-                11,15,16,20,
-                21,25,26,30,
-                31,35,36,40,
-                41,45,46,50,
-                51,55,56,60,
-                61,65,66,70,
-                71,75,76,80,
-                81,85
-), nrow = 17, ncol = 2, byrow = TRUE)
+# v_a = matrix( c(1,5,6,10,
+#                 11,15,16,20,
+#                 21,25,26,30,
+#                 31,35,36,40,
+#                 41,45,46,50,
+#                 51,55,56,60,
+#                 61,65,66,70,
+#                 71,75,76,80,
+#                 81,85
+# ), nrow = 17, ncol = 2, byrow = TRUE)
+
+
+v_a = matrix( c(7,17,
+                18,61,
+                51,91,
+                61,91, 
+                71,91
+            
+), nrow = 5, ncol = 2, byrow = TRUE)
+
+
 
 ## number vaccine coverage scenarios
 n_vac_coverage = length(v_coverage)
@@ -1188,6 +1199,9 @@ for (i in 1:length(v_coverage)) {
 
 ## TO add v_a in the output list also start of vaccination year
 
+####  CHECK POINT:  Check the file names 
+
+
 if (run_type == "interval") {
 
 saveRDS(list(coverage = v_coverage, 
@@ -1200,7 +1214,7 @@ saveRDS(list(coverage = v_coverage,
              v_age_list = v_a,
              lower_bound = lower_bound,
              output=results_list), 
-        file = here::here("model_output", paste0("t3run_", run_type, "_vcov_", v_coverage,
+        file = here::here("model_output", paste0("yng_old_run_", run_type, "_vcov_", v_coverage,
                                                  "_nsamp_", n_sample,"_baseline_", baseline, "_lb_", 
                                                  lower_bound,"_scen_dv34_zero.rds" )))
   
@@ -1215,8 +1229,8 @@ saveRDS(list(coverage = v_coverage,
                v_year = v_year,
                v_age_list = v_a,
                output=results_list), 
-          file = here::here("model_output", paste0("t3run_", run_type, "_vcov_", v_coverage,"_baseline_", baseline,
-                                                   "_nsamp_", n_sample,".rds" )))
+          file = here::here("model_output", paste0("yng_old_run_", run_type, "_vcov_", v_coverage,"_baseline_", baseline,
+                                                   "_nsamp_", n_sample,"_scen_dv34_zero.rds" )))
 }
 
 
