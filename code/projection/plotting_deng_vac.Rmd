@@ -17,46 +17,13 @@ library(ggplot2)
 library(ggpubr)
 library(tidyr)
 library(dplyr)
+library(reshape2)
 ```
 
 
-```{r }
-# # Function to check consistency across datasets
-# check_consistency <- function(..., elements_to_check) {
-#   datasets <- list(...)
-#   
-#   # Extract the first dataset for comparison
-#   first_dataset <- datasets[[1]]
-#   
-#   # Loop over the rest of the datasets
-#   for (i in 2:length(datasets)) {
-#     for (element in elements_to_check) {
-#       if (!identical(first_dataset[[element]], datasets[[i]][[element]])) {
-#         stop(paste("Mismatch found in element", element, "between datasets."))
-#       }
-#     }
-#   }
-#   
-#   message("All specified elements are consistent across datasets.")
-# }
-# 
-# 
-# # Define the elements you want to check for consistency
-# elements_to_check <- c("n_sample", "n_year")
-# 
-# # Run the consistency check
-# check_consistency(
-#   model_projection_v0, 
-#   model_projection_v20, 
-#   model_projection_v50, 
-#   model_projection_v80, 
-#   elements_to_check = elements_to_check
-# )
-
-```
 
 
-## plot absolute cases averted over 50 years
+## plot  cases averted over 50 years
 ```{r}
 ## aggregate over all the age groups
 get_agg_over_age <- function(arr) {
@@ -95,82 +62,85 @@ get_averted <- function(nv_output, v_output, t_begin, t_end, output_type){
 }
 
 
-get_plot_averted <- function(df_v20, df_v50, df_v80,
-                                      ylab, figure_name) {
 
-# Add a column for age groups
-df_v20$age <- 1:nrow(df_v20)
-df_v50$age <- 1:nrow(df_v50)
-df_v80$age <- 1:nrow(df_v80)
+get_plot_averted <- function(df_v20, df_v50, df_v80, ylab, figure_name) {
 
-# Reshape the dataframes to long format
-df_v20_long <- gather(df_v20, key = "Realization", value = "Output", -age)
-df_v50_long <- gather(df_v50, key = "Realization", value = "Output", -age)
-df_v80_long <- gather(df_v80, key = "Realization", value = "Output", -age)
+  # Add a column for age groups
+  df_v20$age <- 1:nrow(df_v20)
+  df_v50$age <- 1:nrow(df_v50)
+  df_v80$age <- 1:nrow(df_v80)
 
-# Add a column to indicate the vaccine coverage for each dataset
-df_v20_long$VaccineCoverage <- "20% Coverage"
-df_v50_long$VaccineCoverage <- "50% Coverage"
-df_v80_long$VaccineCoverage <- "80% Coverage"
+  # Reshape the dataframes to long format
+  df_v20_long <- gather(df_v20, key = "Realization", value = "Output", -age)
+  df_v50_long <- gather(df_v50, key = "Realization", value = "Output", -age)
+  df_v80_long <- gather(df_v80, key = "Realization", value = "Output", -age)
 
-# Combine all datasets into one long dataframe
-df_long <- bind_rows(df_v20_long, df_v50_long, df_v80_long)
+  # Add a column to indicate the vaccine coverage for each dataset
+  df_v20_long$VaccineCoverage <- "20% Coverage"
+  df_v50_long$VaccineCoverage <- "50% Coverage"
+  df_v80_long$VaccineCoverage <- "80% Coverage"
 
-# Calculate the mean and 95% confidence interval for each age group and vaccine coverage
-summary_df <- df_long %>%
-  group_by(age, VaccineCoverage) %>%
-  summarise(
-    mean_output = mean(Output),
-    lower_bound = quantile(Output, 0.025),
-    upper_bound = quantile(Output, 0.975)
-  ) %>%
-  ungroup()
-# Define colors for bars and their darker versions for error bars
-bar_colors <- c("20% Coverage" = "#66c2a5", "50% Coverage" = "#fc8d62", "80% Coverage" = "#8da0cb")
-errorbar_colors <- c("20% Coverage" = "#1b7a53", "50% Coverage" = "#d94e28", "80% Coverage" = "#4a5a92")
+  # Combine all datasets into one long dataframe
+  df_long <- bind_rows(df_v20_long, df_v50_long, df_v80_long)
 
+  # Calculate the mean and 95% confidence interval for each age group and vaccine coverage
+  summary_df <- df_long %>%
+    group_by(age, VaccineCoverage) %>%
+    summarise(
+      mean_output = mean(Output),
+      lower_bound = quantile(Output, 0.025),
+      upper_bound = quantile(Output, 0.975)
+    ) %>%
+    ungroup()
 
-# Plot using ggplot2 with a clean, professional style
-p <- ggplot(summary_df, aes(x = factor(age), y = mean_output, fill = VaccineCoverage)) +
-  geom_bar(stat = "identity", position = position_dodge(width = 0.75), width = 0.65) +
-  geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound, color = VaccineCoverage), 
-                width = 0.0, size = 0.8, position = position_dodge(width = 0.75)) +
-  scale_fill_manual(values = bar_colors) + # Custom colors for bars
-  scale_color_manual(values = errorbar_colors) + # Custom colors for error bars
-  scale_x_discrete(
-    breaks = c(1, 3, 5, 7, 9, 11, 13, 15, 17 ),       # Set the positions of the y-axis ticks
-    labels = c("0-4y","10-14y","20-24y","30-34y", "40-44y", "50-54y", 
-               "60-64y", "70-74y", "80-84y") ) +  # Set the labels for the ticks
-  
-  scale_y_continuous(labels = scales::comma) + # Non-scientific y-axis labels
-  labs(x = "Age at vaccination", y = ylab, 
-       title = "") +
-  theme_minimal() + # Classic theme for a clean look
-  theme(axis.text.x = element_text(angle = 0, hjust = 0.5, size = 14, 
-                                   margin = margin(t = 0, b = 5), 
-                                   face = "plain", color = "black"),
-        axis.text.y = element_text(angle = 90, hjust = 0.5, size = 14, 
-                                   margin = margin(r = 0, l = 5), 
-                                   face="plain", color = "black"), # Vertical y-axis labels
-        axis.title = element_text(size = 16, face = "plain"),
-        legend.position = "top",
-        legend.direction = "horizontal",
-        legend.title = element_blank(), # No legend title for simplicity
-        legend.text = element_text(size = 16, face="plain"),
-        legend.key.size = unit(0.8, "cm"),
-        legend.background = element_blank())
+  # Define colors for different vaccine coverages
+  vaccine_colors <- c("20% Coverage" = "#1b7a53", "50% Coverage" = "#d94e28", "80% Coverage" = "#4a5a92")
 
+  # Define the dodge position for side-by-side plotting
+  dodge <- position_dodge(width = 0.3)
 
-p
-### save
-# ggsave(
-#   filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
-#   plot = p,                                            # The plot object to save
-#   # width = 12,                                           # Width in inches
-#   # height = 12,                                          # Height in inches
-#   dpi = 300          )                                  # DPI (resolution)
+  # Plot using ggplot2
+  p <- ggplot(summary_df, aes(x = factor(age), y = mean_output, color = VaccineCoverage)) +
+    geom_point(size = 9, position = dodge, shape=15) +  # Points for the mean with dodge
+    geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound), 
+                  width = 0.0, size = 1.6, position = dodge) +  # Error bars with dodge
+    scale_color_manual(values = vaccine_colors) + 
+    scale_x_discrete(
+      breaks = c(1, 2, 3, 4, 5, 6, 7),   # Set the positions of the x-axis ticks
+      labels = c("6-16y", "17-30y", "31-40y", "41-50y", "51-60y", "61-70y", "71-80y")  # Labels for age groups
+    ) +
+    scale_y_continuous(labels = scales::comma) +  # Non-scientific y-axis labels
+    labs(x = "Age at vaccination", y = ylab) +  # Labels for x and y axes
+    ylim(c(NA, 15))+
+    theme_bw() +  # Clean theme
+    theme(
+      plot.margin = margin(t=0, r=40, b=0, l=0),
+      axis.text.x = element_text(size = 25, color="black", margin = margin(t = 0, b = 5)),
+      axis.text.y = element_text(size = 25,color="black", margin = margin(r = 0, l = 5)),
+      axis.title = element_text(size = 35, color = "black"),
+      # axis.title = element_blank(),
+      # legend.position = "top",
+      legend.position = "none",
+      legend.direction = "horizontal",
+      legend.title = element_blank(),
+      # legend.text = element_text(size = 25),
+      legend.key.size = unit(1, "cm"),
+      legend.background = element_blank()
+    )
 
- }
+  # Print the plot
+  # print(p)
+
+ggsave(
+  filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
+  plot = p,                                            # The plot object to save
+  width = 28,                                           # Width in inches
+  height = 18,                                          # Height in inches
+  dpi = 300,
+  units = "cm")                                  # DPI (resolution)
+
+}
+
 
 ```
 
@@ -184,16 +154,13 @@ result <- readRDS(here::here("model_output",  rds_file) )
 
 out_v <- as.data.frame(result$output, stringsAsFactors = FALSE)
 
-# rm(list=c("result"))
-
-
 n_vac_age = result$n_vac_age
 n_sample = result$n_sample
 n_age = result$n_age
 n_year = result$n_year
   
   
-  
+
   x <- out_v[,colnames(out_v) == variable_name] 
   
   y <- array(NA, dim = c(n_vac_age,n_sample, n_age, n_year))
@@ -214,44 +181,48 @@ n_year = result$n_year
 
 ## Symptomatic 
 ```{r}
-nv_symp <- extract_variable(rds_file = "t3run_interval_vcov_0.8_nsamp_20_baseline_yes_lb_-Inf_scen_dv34_zero.rds" , 
+
+v_start_year <- readRDS(here::here("model_output",  "detailed_a7_sero_dom_denv2_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds") )$v_year 
+
+
+nv_symp <- extract_variable(rds_file = "detailed_a7_sero_dom_denv2_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" , 
                             variable_name = "symp_sample_age") + 
-           extract_variable(rds_file = "t3run_interval_vcov_0.8_nsamp_20_baseline_yes_lb_-Inf_scen_dv34_zero.rds", 
+           extract_variable(rds_file = "detailed_a7_sero_dom_denv2_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
                             variable_name = "symp_sample_age_v")
 
-v_symp_20 <- extract_variable(rds_file = "t3run_interval_vcov_0.2_nsamp_20_baseline_no_lb_-0.25_scen_dv34_zero.rds",
+v_symp_20 <- extract_variable(rds_file = "detailed_a7_sero_dom_denv2_vcov_0.2_baseline_no_nsamp_100_waning_0.rds",
                               variable_name = "symp_sample_age") + 
-             extract_variable(rds_file = "t3run_interval_vcov_0.2_nsamp_20_baseline_no_lb_-0.25_scen_dv34_zero.rds", 
+             extract_variable(rds_file = "detailed_a7_sero_dom_denv2_vcov_0.2_baseline_no_nsamp_100_waning_0.rds", 
                             variable_name = "symp_sample_age_v")
 
-v_symp_50 <- extract_variable(rds_file = "t3run_interval_vcov_0.5_nsamp_20_baseline_no_lb_-0.25_scen_dv34_zero.rds",
+v_symp_50 <- extract_variable(rds_file = "detailed_a7_sero_dom_denv2_vcov_0.5_baseline_no_nsamp_100_waning_0.rds",
                               variable_name = "symp_sample_age") + 
-             extract_variable(rds_file = "t3run_interval_vcov_0.5_nsamp_20_baseline_no_lb_-0.25_scen_dv34_zero.rds",
+             extract_variable(rds_file = "detailed_a7_sero_dom_denv2_vcov_0.5_baseline_no_nsamp_100_waning_0.rds",
                             variable_name = "symp_sample_age_v")
 
-v_symp_80 <- extract_variable(rds_file = "t3run_interval_vcov_0.8_nsamp_20_baseline_no_lb_-0.25_scen_dv34_zero.rds",
+v_symp_80 <- extract_variable(rds_file = "detailed_a7_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
                               variable_name = "symp_sample_age") + 
-             extract_variable(rds_file = "t3run_interval_vcov_0.8_nsamp_20_baseline_no_lb_-0.25_scen_dv34_zero.rds", 
+             extract_variable(rds_file = "detailed_a7_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds", 
                             variable_name = "symp_sample_age_v")
 
 
 
 averted_inc_v20 <- get_averted(nv_output = nv_symp,
                                  v_output = v_symp_20,
-                                 t_begin = 15,
-                                 t_end = 65,
+                                 t_begin = v_start_year,
+                                 t_end = v_start_year + 9,
                                  output_type = "proportion")
 
 averted_inc_v50 <- get_averted(nv_output = nv_symp,
                                  v_output = v_symp_50,
-                                 t_begin = 15,
-                                 t_end = 65,
+                                 t_begin = v_start_year,
+                                 t_end = v_start_year + 9,
                                  output_type = "proportion")
 
 averted_inc_v80 <- get_averted(nv_output = nv_symp,
                                v_output = v_symp_80,
-                               t_begin = 15,
-                               t_end = 65,
+                               t_begin = v_start_year,
+                               t_end = v_start_year + 9,
                                output_type = "proportion")
 
 
@@ -260,57 +231,114 @@ df_v50 <- as.data.frame(averted_inc_v50)
 df_v80 <- as.data.frame(averted_inc_v80)
 
 symp_averted_plot <- get_plot_averted(df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
-                           ylab = "Reported cases averted (%)" , figure_name = aa.jpg)
+                           ylab = "Reported cases averted (%)" , figure_name = "percent_avert_10y_cases_dominant_2_no_waning.jpg")
 
 symp_averted_plot 
 
 ```
 
 
+## hospitalization
+```{r}
+nv_hosp <- extract_variable(rds_file = "detailed_a7_sero_dom_denv4_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" , 
+                            variable_name = "hosp_sample_age") + 
+           extract_variable(rds_file = "detailed_a7_sero_dom_denv4_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
+                            variable_name = "hosp_sample_age_v")
 
+v_hosp_20 <- extract_variable(rds_file = "detailed_a7_sero_dom_denv4_vcov_0.2_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "hosp_sample_age") + 
+             extract_variable(rds_file = "detailed_a7_sero_dom_denv4_vcov_0.2_baseline_no_nsamp_100_waning_0.rds", 
+                            variable_name = "hosp_sample_age_v")
+
+v_hosp_50 <- extract_variable(rds_file = "detailed_a7_sero_dom_denv4_vcov_0.5_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "hosp_sample_age") + 
+             extract_variable(rds_file = "detailed_a7_sero_dom_denv4_vcov_0.5_baseline_no_nsamp_100_waning_0.rds",
+                            variable_name = "hosp_sample_age_v")
+
+v_hosp_80 <- extract_variable(rds_file = "detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "hosp_sample_age") + 
+             extract_variable(rds_file = "detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0.rds", 
+                            variable_name = "hosp_sample_age_v")
+
+
+
+averted_inc_v20 <- get_averted(nv_output = nv_hosp,
+                                 v_output = v_hosp_20,
+                                 t_begin = v_start_year,
+                                 t_end = v_start_year + 9,
+                                  output_type = "proportion")
+
+averted_inc_v50 <- get_averted(nv_output = nv_hosp,
+                                 v_output = v_hosp_50,
+                                 t_begin = v_start_year,
+                                 t_end = v_start_year + 9,
+                                  output_type = "proportion")
+
+
+averted_inc_v80 <- get_averted(nv_output = nv_hosp,
+                                 v_output = v_hosp_80,
+                                 t_begin = v_start_year,
+                                 t_end = v_start_year + 9,
+                                  output_type = "proportion")
+
+
+
+
+df_v20 <- as.data.frame(averted_inc_v20)
+df_v50 <- as.data.frame(averted_inc_v50)
+df_v80 <- as.data.frame(averted_inc_v80)
+
+hosp_averted_plot <- get_plot_averted(df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
+                           ylab = "Hospitalization averted (%)" , figure_name = "percent_avert_10y_hosp_dominant_4_no_waning.jpg")
+
+hosp_averted_plot 
+```
 
 
 ## Infection 
 ```{r}
-nv_inf <- extract_variable(rds_file = "run_point_vcov_0_nsamp_20.rds" , 
+
+v_start_year <- readRDS(here::here("model_output",  "import_a8_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds") )$v_year 
+
+nv_inf <- extract_variable(rds_file = "a5_sn_ve_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" , 
                             variable_name = "inf_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0_nsamp_20.rds", 
+           extract_variable(rds_file = "a5_sn_ve_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
                             variable_name = "inf_sample_age_v")
 
-v_inf_20 <- extract_variable(rds_file = "run_point_vcov_0.2_nsamp_20.rds",
+v_inf_20 <- extract_variable(rds_file = "import_a8_sero_dom_denv2_vcov_0.2_baseline_no_nsamp_100_waning_0.rds",
                               variable_name = "inf_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0.2_nsamp_20.rds", 
+           extract_variable(rds_file = "import_a8_sero_dom_denv2_vcov_0.2_baseline_no_nsamp_100_waning_0.rds", 
                             variable_name = "inf_sample_age_v")
 
-v_inf_50 <- extract_variable(rds_file = "run_point_vcov_0.5_nsamp_20.rds",
+v_inf_50 <- extract_variable(rds_file = "import_a8_sero_dom_denv2_vcov_0.5_baseline_no_nsamp_100_waning_0.rds",
                               variable_name = "inf_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0.5_nsamp_20.rds",
+           extract_variable(rds_file = "import_a8_sero_dom_denv2_vcov_0.5_baseline_no_nsamp_100_waning_0.rds",
                             variable_name = "inf_sample_age_v")
 
-v_inf_80 <- extract_variable(rds_file = "run_point_vcov_0.8_nsamp_20.rds",
+v_inf_80 <- extract_variable(rds_file = "import_a8_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
                               variable_name = "inf_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0.8_nsamp_20.rds", 
+           extract_variable(rds_file = "import_a8_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds", 
                             variable_name = "inf_sample_age_v")
 
 
 
 averted_inc_v20 <- get_averted(nv_output = nv_inf,
                                  v_output = v_inf_20,
-                                 t_begin = 15,
-                                 t_end = 65,
+                                 t_begin = v_start_year,
+                                 t_end = v_start_year + 9,
                                   output_type = "proportion")
 
 averted_inc_v50 <- get_averted(nv_output = nv_inf,
                                  v_output = v_inf_50,
-                                 t_begin = 15,
-                                 t_end = 65,
+                                 t_begin = v_start_year,
+                                 t_end = v_start_year + 9,
                                   output_type = "proportion")
 
 
 averted_inc_v80 <- get_averted(nv_output = nv_inf,
                                  v_output = v_inf_80,
-                                 t_begin = 15,
-                                 t_end = 65,
+                                 t_begin = v_start_year,
+                                 t_end = v_start_year + 9,
                                   output_type = "proportion")
 
 
@@ -325,402 +353,273 @@ inf_averted_plot <- get_plot_averted(df_v20 = df_v20 , df_v50 = df_v50, df_v80 =
 
 inf_averted_plot 
 ```
-
-
-
-
-## hospitalization
+## checks on age
 ```{r}
-nv_hosp <- extract_variable(rds_file = "run_point_vcov_0_nsamp_20.rds" , 
-                            variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0_nsamp_20.rds", 
-                            variable_name = "hosp_sample_age_v")
-
-v_hosp_20 <- extract_variable(rds_file = "run_point_vcov_0.2_nsamp_20.rds",
-                              variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0.2_nsamp_20.rds", 
-                            variable_name = "hosp_sample_age_v")
-
-v_hosp_50 <- extract_variable(rds_file = "run_point_vcov_0.5_nsamp_20.rds",
-                              variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0.5_nsamp_20.rds",
-                            variable_name = "hosp_sample_age_v")
-
-v_hosp_80 <- extract_variable(rds_file = "run_point_vcov_0.8_nsamp_20.rds",
-                              variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0.8_nsamp_20.rds", 
-                            variable_name = "hosp_sample_age_v")
-
-
-
-averted_inc_v20 <- get_averted(nv_output = nv_hosp,
-                                 v_output = v_hosp_20,
-                                 t_begin = 15,
-                                 t_end = 65,
-                                  output_type = "proportion")
-
-averted_inc_v50 <- get_averted(nv_output = nv_hosp,
-                                 v_output = v_hosp_50,
-                                 t_begin = 15,
-                                 t_end = 65,
-                                  output_type = "proportion")
-
-
-averted_inc_v80 <- get_averted(nv_output = nv_hosp,
-                                 v_output = v_hosp_80,
-                                 t_begin = 15,
-                                 t_end = 65,
-                                  output_type = "proportion")
+# abs_inf_over_age <- rowSums(nv_inf[1,1,,15:24])
+# 
+# abs_symp_over_age <- rowSums(nv_symp[1,1,,15:24])
 
 
 
 
-df_v20 <- as.data.frame(averted_inc_v20)
-df_v50 <- as.data.frame(averted_inc_v50)
-df_v80 <- as.data.frame(averted_inc_v80)
 
-hosp_averted_plot <- get_plot_averted(df_v20 = df_v20 , df_v50 = df_v50, df_v80 = df_v80 , 
-                           ylab = "Hospitalization averted (%)" , figure_name = aa.jpg)
+# inc_inf_over_age <- rowSums(nv_inf[1,1,,15:24]/pop_age[1,1,,15:24])/10
+# 
+# inc_symp_over_age <- rowSums(nv_symp[1,1,,15:24]/pop_age[1,1,,15:24])/10
 
-hosp_averted_plot 
+
+get_cumulative_age_wise <- function(arr,age_list) {
+  # arr_cum_time_age <- apply(arr[ ,t_begin:t_end], c(1), sum)
+ 
+  arr_cum_age_gr <- array(NA, dim = c(nrow(age_list),dim(arr)[2]))
+   
+  for (i in 1:nrow(age_list)) {
+
+    arr_cum_age_gr[i,] <-  colSums(arr[age_list[i,1]:age_list[i,2],])
+    
+  }
+  
+  return(arr_cum_age_gr)
+}
+
+## age brackets
+# age_list <- readRDS(here::here("model_output",  "detailed_a7_sero_dom_denv4_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds") )$v_age_list
+
+age_list = matrix( c(1,5,
+                6, 15,
+                16, 25,
+                26, 35,
+                36, 45,
+                46, 55,
+                56, 65,
+                66, 90
+
+), nrow = 8, ncol = 2, byrow = TRUE)
+
+
+## pop in different age groups
+pop_age <- extract_variable(rds_file = "detailed_a7_sero_dom_denv4_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" , 
+                            variable_name = "tot_pop_sample_age")
+
+nv_hosp <- extract_variable(rds_file = "detailed_a7_sero_dom_denv4_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" , 
+                            variable_name = "hosp_sample_age_secondary") + 
+           extract_variable(rds_file = "detailed_a7_sero_dom_denv4_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
+                            variable_name = "hosp_sample_age_v_secondary")
+## age bracket
+# inf_age_bracket <- rowSums(get_cumulative_age_wise(arr = nv_inf[1,1,,], 
+#                                            age_list = age_list)[,10:19]
+#                            )
+
+
+symp_age_bracket <- rowSums(get_cumulative_age_wise(arr = nv_symp[1,1,,], 
+                                           age_list = age_list)[,10:19]
+                            )
+
+hosp_age_bracket <- rowSums(get_cumulative_age_wise(arr = nv_hosp[1,1,,], 
+                                           age_list = age_list)[,10:19]
+                            )
+
+
+inci_symp_age_bracket <- rowSums( (get_cumulative_age_wise(arr = nv_symp[1,1,,], 
+                                           age_list = age_list)/get_cumulative_age_wise(arr = pop_age[1,1,,], 
+                                           age_list = age_list))[,10:19])
+
+inci_hosp_age_bracket <- rowSums( (get_cumulative_age_wise(arr = nv_hosp[1,1,,], 
+                                           age_list = age_list)/get_cumulative_age_wise(arr = pop_age[1,1,,], 
+                                           age_list = age_list))[,10:19])
+
 ```
 
-### Function for plotting the averted cases along with point estimate
+
+### FVP to avert one cases/hospitalization
 
 ```{r}
-get_plot_averted_with_pt_estimate <- function(df_v20_intv, df_v50_intv, df_v80_intv,
-                                              df_v20_pt, df_v50_pt, df_v80_pt,
-                                      ylab, figure_name) {
-
-# Add a column for age groups
-df_v20_intv$age <- 1:nrow(df_v20_intv)
-df_v50_intv$age <- 1:nrow(df_v50_intv)
-df_v80_intv$age <- 1:nrow(df_v80_intv)
-
-# Reshape the dataframes to long format
-df_v20_long_intv <- gather(df_v20_intv, key = "Realization", value = "Output", -age)
-df_v50_long_intv <- gather(df_v50_intv, key = "Realization", value = "Output", -age)
-df_v80_long_intv <- gather(df_v80_intv, key = "Realization", value = "Output", -age)
-
-# Add a column to indicate the vaccine coverage for each dataset
-df_v20_long_intv$VaccineCoverage <- "20% Coverage"
-df_v50_long_intv$VaccineCoverage <- "50% Coverage"
-df_v80_long_intv$VaccineCoverage <- "80% Coverage"
-
-# Combine all datasets into one long dataframe
-df_long_intv <- bind_rows(df_v20_long_intv, df_v50_long_intv, df_v80_long_intv)
-
-# Calculate the mean and 95% confidence interval for each age group and vaccine coverage
-summary_df_intv <- df_long_intv %>%
-  group_by(age, VaccineCoverage) %>%
-  summarise(
-    mean_output = mean(Output),
-    lower_bound = quantile(Output, 0.025),
-    upper_bound = quantile(Output, 0.975)
-  ) %>%
-  ungroup()
-
-
-## DO the same for point estimate
-# Add a column for age groups
-df_v20_pt$age <- 1:nrow(df_v20_pt)
-df_v50_pt$age <- 1:nrow(df_v50_pt)
-df_v80_pt$age <- 1:nrow(df_v80_pt)
-
-# Reshape the dataframes to long format
-df_v20_long_pt <- gather(df_v20_pt, key = "Realization", value = "Output", -age)
-df_v50_long_pt <- gather(df_v50_pt, key = "Realization", value = "Output", -age)
-df_v80_long_pt <- gather(df_v80_pt, key = "Realization", value = "Output", -age)
-
-# Add a column to indicate the vaccine coverage for each dataset
-df_v20_long_pt$VaccineCoverage <- "20% Coverage"
-df_v50_long_pt$VaccineCoverage <- "50% Coverage"
-df_v80_long_pt$VaccineCoverage <- "80% Coverage"
-
-# Combine all datasets into one long dataframe
-df_long_pt <- bind_rows(df_v20_long_pt, df_v50_long_pt, df_v80_long_pt)
-
-# Calculate the mean and 95% confidence interval for each age group and vaccine coverage
-summary_df_pt <- df_long_pt %>%
-  group_by(age, VaccineCoverage) %>%
-  summarise(
-    mean_output = mean(Output),
-    # lower_bound = quantile(Output, 0.025),
-    # upper_bound = quantile(Output, 0.975)
-  ) %>%
-  ungroup()
-
-# Define colors for bars and their darker versions for error bars
-bar_colors <- c("20% Coverage" = "#66c2a5", "50% Coverage" = "#fc8d62", "80% Coverage" = "#8da0cb")
-errorbar_colors <- c("20% Coverage" = "#1b7a53", "50% Coverage" = "#d94e28", "80% Coverage" = "#4a5a92")
-
-
-# Plot using ggplot2 with a clean, professional style
-p <- ggplot(summary_df_intv, aes(x = factor(age), y = mean_output, fill = VaccineCoverage)) +
-  geom_bar(stat = "identity", position = position_dodge(width = 0.75), width = 0.65) +
-  geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound, color = VaccineCoverage), 
-                width = 0.0, size = 0.8, position = position_dodge(width = 0.75)) +
+get_averted_per_vac <- function(nv_output, v_output, total_vac_output,  t_begin, t_end){
   
-  geom_point(data = summary_df_pt, aes(x = factor(age),
-                                       y = mean_output, group = VaccineCoverage, 
-                                       color = VaccineCoverage),
-                                       position = position_dodge(width = 0.75),
-                                       size = 2, shape = 17, stroke = 1.5) + 
-
-  scale_fill_manual(values = bar_colors) + # Custom colors for bars
-  scale_color_manual(values = errorbar_colors) + # Custom colors for error bars
-  scale_x_discrete(
-    breaks = c(1, 3, 5, 7, 9, 11, 13, 15, 17 ),       # Set the positions of the y-axis ticks
-    labels = c("0-4y","10-14y","20-24y","30-34y", "40-44y", "50-54y", 
-               "60-64y", "70-74y", "80-84y") ) +  # Set the labels for the ticks
+  nv_agg_age <- get_agg_over_age(nv_output)
+  v_agg_age <-  get_agg_over_age(v_output)
+  total_vac_agg_age <- get_agg_over_age(total_vac_output)
   
-  scale_y_continuous(labels = scales::comma) + # Non-scientific y-axis labels
-  labs(x = "Age at vaccination", y = ylab, 
-       title = "") +
-  theme_minimal() + # Classic theme for a clean look
-  theme(axis.text.x = element_text(angle = 0, hjust = 0.5, size = 14, 
-                                   margin = margin(t = 0, b = 5), 
-                                   face = "plain", color = "black"),
-        axis.text.y = element_text(angle = 90, hjust = 0.5, size = 14, 
-                                   margin = margin(r = 0, l = 5), 
-                                   face="plain", color = "black"), # Vertical y-axis labels
-        axis.title = element_text(size = 16, face = "plain"),
-        legend.position = "top",
-        legend.direction = "horizontal",
-        legend.title = element_blank(), # No legend title for simplicity
-        legend.text = element_text(size = 16, face="plain"),
-        legend.key.size = unit(0.8, "cm"),
-        legend.background = element_blank()) + 
- # Override the default shape in the legend
-  guides(color = guide_legend(override.aes = list(shape = NA, linetype = 1, size = 1.5)))
+  nv_cum_t <- get_cumulative_over_time( nv_agg_age, t_begin = t_begin, t_end = t_end)
+  v_cum_t <- get_cumulative_over_time( v_agg_age, t_begin = t_begin, t_end = t_end)
+  total_vac_cum_t <- get_cumulative_over_time(total_vac_agg_age, t_begin = t_begin, t_end = t_end)
+  # total_vac_cum_t <- get_cumulative_over_time(total_vac_agg_age, t_begin = t_end, t_end = t_end) ## this is beacuse we did not calculate from the beginning of the vaccination
+
+ 
+  averted_per_vac <- 1000*(nv_cum_t - v_cum_t)/total_vac_cum_t
+
+
+  
+  return(averted_per_vac)
+  
+}
+
+
+
+get_plot_averted_per_vac <- function(df_total, df_seroneg, df_seropos, ylab, figure_name) {
+
+  
+   # Add a column for age groups
+  df_total$age <- 1:nrow(df_total)
+  df_seroneg$age <- 1:nrow(df_seroneg)
+  df_seropos$age <- 1:nrow(df_seropos)
+
+  # Reshape the dataframes to long format
+  df_total_long <- gather(df_total, key = "Realization", value = "Output", -age)
+  df_seroneg_long <- gather(df_seroneg, key = "Realization", value = "Output", -age)
+  df_seropos_long <- gather(df_seropos, key = "Realization", value = "Output", -age)
+
+  # Add a column to indicate the vaccine coverage for each dataset
+  df_total_long$poptype <- "All"
+  df_seroneg_long$poptype <- "Seronegative"
+  df_seropos_long$poptype <- "Seropositive"
+
+  # Combine all datasets into one long dataframe
+  df_long <- bind_rows(df_total_long, df_seroneg_long, df_seropos_long)
+
+  # Calculate the mean and 95% confidence interval for each age group and vaccine coverage
+  summary_df <- df_long %>%
+    group_by(age, poptype) %>%
+    summarise(
+      mean_output = mean(Output),
+      lower_bound = quantile(Output, 0.025),
+      upper_bound = quantile(Output, 0.975)
+    ) %>%
+    ungroup()
+  
+  
+   
+  # Define colors for different vaccine coverages
+  poptype_colors <- c("All" = "#8dd3c7", "Seronegative" = "#fdb462", "Seropositive" = "#b3de69")
+  
+  # Define the dodge position for side-by-side plotting
+  dodge <- position_dodge(width = 0.3)
+  
+  # Plot using ggplot2
+  p <- ggplot(summary_df, aes(x = factor(age), y = mean_output, color = poptype)) +
+    geom_point(size = 9, position = dodge, shape = 16) +  # Points for the mean with dodge
+    geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound), 
+                  width = 0.0, size = 1.8, position = dodge) +  # Error bars with dodge
+    scale_color_manual(values = poptype_colors, name = "") + 
+    scale_x_discrete(
+      breaks = c(1, 2, 3, 4, 5, 6, 7),   # Set the positions of the x-axis ticks
+      labels = c("6-16", "17-30", "31-40", "41-50", "51-60", "61-70", "71-80")  # Labels for age groups
+    ) +
+    scale_y_continuous(limits = c(NA,50), breaks = seq(0, 50, by = 10)) + 
+    # labs(x = "Age at vaccination", y = ylab, color = NULL) +  # Labels for x and y axes
+    # scale_y_continuous(limits = c(NA,500), breaks = seq(-300, 500, by = 100)) +  # Define y-axis tick points )+
+    theme_bw() +  # Clean theme
+    theme(
+      axis.ticks.length = unit(0.4, "cm"),        # Increase the length of the ticks
+      axis.ticks = element_line(size = 1.5),      # Increase the thickness of the ticks
+      panel.border = element_rect(color = "black", size = 2),  # Thicker border
+      plot.margin = margin(t=10, r=10, b=20, l=20),
+      axis.text.x = element_text(size = 35, color="black", angle= 0, margin = margin(t = 10, b = 20)),
+      axis.text.y = element_text(size = 35,color="black", margin = margin(r = 10, l = 10)),
+      # axis.title = element_text(size = 35, color = "black"),
+      axis.title = element_blank(),
+      legend.position = "top",
+      legend.direction = "horizontal",
+      legend.text = element_text(size = 40),
+      legend.key.size = unit(2, "cm"),  # Increase size of legend keys
+      legend.key.height = unit(1.5, "cm"),  # Increase height of legend keys
+      legend.key.width = unit(2.5, "cm"),  # Increase width of legend keys
+      legend.background = element_blank()
+    )
   
 
-p
-### save
-# ggsave(
-#   filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
-#   plot = p,                                            # The plot object to save
-#   # width = 12,                                           # Width in inches
-#   # height = 12,                                          # Height in inches
-#   dpi = 300          )                                  # DPI (resolution)
 
  }
 ```
 
 ## Symptomatic 
 ```{r}
-nv_symp <- extract_variable(rds_file = "run_point_vcov_0_nsamp_20.rds" , 
-                            variable_name = "symp_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0_nsamp_20.rds", 
+
+t_begin <- readRDS(here::here("model_output",  "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds") )$v_year 
+
+t_end = t_begin +9
+
+
+
+# total
+
+nv_total <- extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" ,
+                            variable_name = "symp_sample_age") +
+           extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
                             variable_name = "symp_sample_age_v")
 
-v_symp_20_pt <- extract_variable(rds_file = "run_point_vcov_0.2_nsamp_20.rds",
-                              variable_name = "symp_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0.2_nsamp_20.rds", 
+v_total <- extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "symp_sample_age") +
+           extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
                             variable_name = "symp_sample_age_v")
 
-v_symp_50_pt <- extract_variable(rds_file = "run_point_vcov_0.5_nsamp_20.rds",
-                              variable_name = "symp_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0.5_nsamp_20.rds",
-                            variable_name = "symp_sample_age_v")
+new_vac_total <- extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "new_vac_sample_age")
 
-v_symp_80_pt <- extract_variable(rds_file = "run_point_vcov_0.8_nsamp_20.rds",
-                              variable_name = "symp_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0.8_nsamp_20.rds", 
-                            variable_name = "symp_sample_age_v")
+# ## seronegative
+nv_seroneg <- extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" ,
+                            variable_name = "symp_sample_age_primary") +
+           extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+                            variable_name = "symp_sample_age_v_primary")
 
+v_seroneg <- extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "symp_sample_age_primary") +
+           extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                            variable_name = "symp_sample_age_v_primary")
 
-
-averted_inc_v20_pt <- get_averted(nv_output = nv_symp,
-                                 v_output = v_symp_20_pt,
-                                 t_begin = 15,
-                                 t_end = 65,
-                                  output_type = "proportion")
-
-averted_inc_v50_pt <- get_averted(nv_output = nv_symp,
-                                 v_output = v_symp_50_pt,
-                                 t_begin = 15,
-                                 t_end = 65,
-                                output_type = "proportion")
-
-averted_inc_v80_pt <- get_averted(nv_output = nv_symp,
-                               v_output = v_symp_80_pt,
-                               t_begin = 15,
-                               t_end = 65,
-                               output_type = "proportion")
+new_vac_seroneg <- extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "new_vac_sample_age_primary")
 
 
-df_v20_pt <- as.data.frame(averted_inc_v20_pt)
-df_v50_pt <- as.data.frame(averted_inc_v50_pt)
-df_v80_pt <- as.data.frame(averted_inc_v80_pt)
+## seropositive
+nv_seropos <- extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" ,
+                            variable_name = "symp_sample_age_secondary") +
+           extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+                            variable_name = "symp_sample_age_v_secondary")
 
-### with interval 
-nv_symp_intv <- extract_variable(rds_file = "run_interval_vcov_0_nsamp_20_lb_0_scen_dv34_zero.rds" , 
-                            variable_name = "symp_sample_age") + 
-           extract_variable(rds_file = "run_interval_vcov_0_nsamp_20_lb_0_scen_dv34_zero.rds", 
-                            variable_name = "symp_sample_age_v")
+v_seropos <- extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "symp_sample_age_secondary") +
+           extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                            variable_name = "symp_sample_age_v_secondary")
 
-v_symp_20_intv <- extract_variable(rds_file = "run_interval_vcov_0.2_nsamp_20_lb_0_scen_dv34_zero.rds",
-                              variable_name = "symp_sample_age") + 
-           extract_variable(rds_file = "run_interval_vcov_0.2_nsamp_20_lb_0_scen_dv34_zero.rds", 
-                            variable_name = "symp_sample_age_v")
+new_vac_seropos <- extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "new_vac_sample_age_secondary")
 
-v_symp_50_intv <- extract_variable(rds_file = "run_interval_vcov_0.5_nsamp_20_lb_0_scen_dv34_zero.rds",
-                              variable_name = "symp_sample_age") + 
-           extract_variable(rds_file = "run_interval_vcov_0.5_nsamp_20_lb_0_scen_dv34_zero.rds",
-                            variable_name = "symp_sample_age_v")
+averted_per_vac_total <- get_averted_per_vac(nv_output = nv_total,
+                               v_output = v_total,
+                               total_vac_output = new_vac_total,
+                               t_begin = t_begin,
+                               t_end = t_end)
 
-v_symp_80_intv <- extract_variable(rds_file = "run_interval_vcov_0.8_nsamp_20_lb_0_scen_dv34_zero.rds",
-                              variable_name = "symp_sample_age") + 
-           extract_variable(rds_file = "run_interval_vcov_0.8_nsamp_20_lb_0_scen_dv34_zero.rds", 
-                            variable_name = "symp_sample_age_v")
+averted_per_vac_seroneg <- get_averted_per_vac(nv_output = nv_seroneg,
+                               v_output = v_seroneg,
+                               total_vac_output = new_vac_seroneg,
+                               t_begin = t_begin,
+                               t_end = t_end)
 
+averted_per_vac_seropos <- get_averted_per_vac(nv_output = nv_seropos,
+                               v_output = v_seropos,
+                               total_vac_output = new_vac_seropos,
+                               t_begin = t_begin,
+                               t_end = t_end)
 
+df_averted_per_vac_total <- as.data.frame(averted_per_vac_total)
 
-averted_inc_v20_intv <- get_averted(nv_output = nv_symp_intv,
-                                 v_output = v_symp_20_intv,
-                                 t_begin = 15,
-                                 t_end = 65,
-                                  output_type = "proportion")
+df_averted_per_vac_seroneg <- as.data.frame(averted_per_vac_seroneg)
 
-averted_inc_v50_intv <- get_averted(nv_output = nv_symp_intv,
-                                 v_output = v_symp_50_intv,
-                                 t_begin = 15,
-                                 t_end = 65,
-                                output_type = "proportion")
-
-averted_inc_v80_intv <- get_averted(nv_output = nv_symp_intv,
-                               v_output = v_symp_80_intv,
-                               t_begin = 15,
-                               t_end = 65,
-                               output_type = "proportion")
-
-
-df_v20_intv <- as.data.frame(averted_inc_v20_intv)
-df_v50_intv <- as.data.frame(averted_inc_v50_intv)
-df_v80_intv <- as.data.frame(averted_inc_v80_intv)
+df_averted_per_vac_seropos <- as.data.frame(averted_per_vac_seropos)
 
 
 
-symp_averted_plot_w_pt <- get_plot_averted_with_pt_estimate(df_v20_intv = df_v20_intv , 
-                                      df_v50_intv = df_v50_intv, 
-                                      df_v80_intv = df_v80_intv,
-                                      df_v20_pt = df_v20_pt , 
-                                      df_v50_pt = df_v50_pt, 
-                                      df_v80_pt = df_v80_pt , 
-                           ylab = "Reported cases averted (%)" , figure_name = aa.jpg)
-
-symp_averted_plot_w_pt
+averted_plot_per_vac <- get_plot_averted_per_vac(
+                                      df_total = df_averted_per_vac_total,
+                                      df_seroneg = df_averted_per_vac_seroneg,
+                                      df_seropos = df_averted_per_vac_seropos,
+                                      ylab = "Reported cases averted \nper 10000 vaccinated" , 
+                                      figure_name = "avert_cases_per_10k.jpg")
+averted_plot_per_vac
 
 ```
-
-
-### Hospitalized plot with point estimate
-
-## Hospitalized
-```{r}
-nv_hosp <- extract_variable(rds_file = "run_point_vcov_0_nsamp_20.rds" , 
-                            variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0_nsamp_20.rds", 
-                            variable_name = "hosp_sample_age_v")
-
-v_hosp_20_pt <- extract_variable(rds_file = "run_point_vcov_0.2_nsamp_20.rds",
-                              variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0.2_nsamp_20.rds", 
-                            variable_name = "hosp_sample_age_v")
-
-v_hosp_50_pt <- extract_variable(rds_file = "run_point_vcov_0.5_nsamp_20.rds",
-                              variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0.5_nsamp_20.rds",
-                            variable_name = "hosp_sample_age_v")
-
-v_hosp_80_pt <- extract_variable(rds_file = "run_point_vcov_0.8_nsamp_20.rds",
-                              variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "run_point_vcov_0.8_nsamp_20.rds", 
-                            variable_name = "hosp_sample_age_v")
-
-
-
-averted_inc_v20_pt <- get_averted(nv_output = nv_hosp,
-                                 v_output = v_hosp_20_pt,
-                                 t_begin = 15,
-                                 t_end = 65,
-                                  output_type = "proportion")
-
-averted_inc_v50_pt <- get_averted(nv_output = nv_hosp,
-                                 v_output = v_hosp_50_pt,
-                                 t_begin = 15,
-                                 t_end = 65,
-                                output_type = "proportion")
-
-averted_inc_v80_pt <- get_averted(nv_output = nv_hosp,
-                               v_output = v_hosp_80_pt,
-                               t_begin = 15,
-                               t_end = 65,
-                               output_type = "proportion")
-
-
-df_v20_pt <- as.data.frame(averted_inc_v20_pt)
-df_v50_pt <- as.data.frame(averted_inc_v50_pt)
-df_v80_pt <- as.data.frame(averted_inc_v80_pt)
-
-### with interval 
-v_hosp_20_intv <- extract_variable(rds_file = "run_interval_vcov_0.2_nsamp_20_lb_0_scen_dv34_zero.rds",
-                              variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "run_interval_vcov_0.2_nsamp_20_lb_0_scen_dv34_zero.rds", 
-                            variable_name = "hosp_sample_age_v")
-
-v_hosp_50_intv <- extract_variable(rds_file = "run_interval_vcov_0.5_nsamp_20_lb_0_scen_dv34_zero.rds",
-                              variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "run_interval_vcov_0.5_nsamp_20_lb_0_scen_dv34_zero.rds",
-                            variable_name = "hosp_sample_age_v")
-
-v_hosp_80_intv <- extract_variable(rds_file = "run_interval_vcov_0.8_nsamp_20_lb_0_scen_dv34_zero.rds",
-                              variable_name = "hosp_sample_age") + 
-           extract_variable(rds_file = "run_interval_vcov_0.8_nsamp_20_lb_0_scen_dv34_zero.rds", 
-                            variable_name = "hosp_sample_age_v")
-
-
-
-averted_inc_v20_intv <- get_averted(nv_output = nv_hosp,
-                                 v_output = v_hosp_20_intv,
-                                 t_begin = 15,
-                                 t_end = 65,
-                                  output_type = "proportion")
-
-averted_inc_v50_intv <- get_averted(nv_output = nv_hosp,
-                                 v_output = v_hosp_50_intv,
-                                 t_begin = 15,
-                                 t_end = 65,
-                                output_type = "proportion")
-
-averted_inc_v80_intv <- get_averted(nv_output = nv_hosp,
-                               v_output = v_hosp_80_intv,
-                               t_begin = 15,
-                               t_end = 65,
-                               output_type = "proportion")
-
-
-df_v20_intv <- as.data.frame(averted_inc_v20_intv)
-df_v50_intv <- as.data.frame(averted_inc_v50_intv)
-df_v80_intv <- as.data.frame(averted_inc_v80_intv)
-
-
-
-hosp_averted_plot_w_pt <- get_plot_averted_with_pt_estimate(df_v20_intv = df_v20_intv , 
-                                      df_v50_intv = df_v50_intv, 
-                                      df_v80_intv = df_v80_intv,
-                                      df_v20_pt = df_v20_pt , 
-                                      df_v50_pt = df_v50_pt, 
-                                      df_v80_pt = df_v80_pt , 
-                           ylab = "Hospitalization averted (%)" , figure_name = aa.jpg)
-
-hosp_averted_plot_w_pt
-
-```
-
-
-
 
 
 
@@ -729,101 +628,2218 @@ hosp_averted_plot_w_pt
 
 ```{r}
 
-total_pop_age <- extract_variable(rds_file = "run_point_vcov_0_nsamp_20.rds",
+total_pop_age <- extract_variable(rds_file = "sero_dom_denv1_vcov_0.2_baseline_no_nsamp_100_waning_0.2.rds",
                               variable_name = "tot_pop_sample_age")
 
-v_vac_age_20 <- extract_variable(rds_file = "run_point_vcov_0.2_nsamp_20.rds",
+v_vac_age_20 <- extract_variable(rds_file = "sero_dom_denv1_vcov_0.2_baseline_no_nsamp_100_waning_0.2.rds",
                               variable_name = "tot_pop_sample_age_v")
 
-v_vac_age_50 <- extract_variable(rds_file = "test_model_vcov_0.5_nsamp_20_lb_-0.25_ve_scenario1.rds",
-                              variable_name = "tot_pop_sample_age_v") 
-
-v_vac_age_80 <- extract_variable(rds_file = "test_model_vcov_0.8_nsamp_20_lb_-0.25_ve_scenario1.rds",
-                              variable_name = "tot_pop_sample_age_v")
+# v_vac_age_50 <- extract_variable(rds_file = "test_model_vcov_0.5_nsamp_20_lb_-0.25_ve_scenario1.rds",
+#                               variable_name = "tot_pop_sample_age_v") 
+# 
+# v_vac_age_80 <- extract_variable(rds_file = "test_model_vcov_0.8_nsamp_20_lb_-0.25_ve_scenario1.rds",
+#                               variable_name = "tot_pop_sample_age_v")
 # total_pop <- get_agg_over_age(total_pop_age)
 # 
 # total_vac_20 <- get_agg_over_age(v_vac_age_20)
-# 
+
 # 
 # total_vac_50 <- get_agg_over_age(v_vac_age_50)
 
-matplot(t(v_vac_age_20[2,1,,]/total_pop_age[2,1,,]), type = "l")
+matplot(100*t(v_vac_age_20[1,,8,]/total_pop_age[1,,8,]), type = "l")
 ```
 
-## age wise impact of vaccination
+
+
+
+
+## age wise impact of vaccination on vaccinated individual(of the mean estimate)
 ```{r}
 
-v_a = matrix( c(1,5,6,10,
-                11,15,16,20,
-                21,25,26,30,
-                31,35,36,40,
-                41,45,46,50,
-                51,55,56,60,
-                61,65,66,70,
-                71,75,76,80,
-                81,85
-), nrow = 17, ncol = 2, byrow = TRUE)
+get_plot_averted_matrix <- function(df_averted_mean) {
 
-
-
-get_agg_over_diff_age <- function(arr, age_division) {
   
-  arr_targ_v_age <- array(NA, dim = c(n_vac_age,n_sample, n_vac_age, sim_year))
-
-
-for (i in 1:n_vac_age) {
-  for (j in 1:n_sample) {
-    for (k in 1:n_vac_age) {
-      for (l in 1:sim_year) {
-        
-      arr_targ_v_age[i,j,k,l] <- sum(arr[i,j,age_division[k,1]:age_division[k,2],l])
-      
-      }
-}
-}
-} 
-return(arr_targ_v_age)
-}
-
-
-nv_symp_age <- get_agg_over_diff_age(arr = nv_symp, age_division = v_a)  
-v_symp_20_age <- get_agg_over_diff_age(arr = v_symp_80_pt, age_division = v_a)
-nv_symp_age_agg <- apply(nv_symp_age[, , ,15:65], c(1, 2,3), sum)
-v_symp_20_age_agg <- apply(v_symp_20_age[, , ,15:65], c(1, 2,3), sum)
-v_symp_20_avert <- 100*(nv_symp_age_agg - v_symp_20_age_agg)/nv_symp_age_agg
-
-v_symp_20_avert_mean <- apply(v_symp_20_avert, c(1,3), mean)
-
-
-# Load necessary libraries
-library(ggplot2)
-library(reshape2)
-
-# # Example matrix of 17 by 17 continuous data
-# set.seed(123)
-# mat <- matrix(runif(17 * 17, min = 0, max = 100), nrow = 17, ncol = 17)
-
-# Melt the matrix into a long format data frame
-df <- melt(v_symp_20_avert_mean)
+ age_group_labels <- c("6-16y","17-30y",
+                                    "31-40y","41-50y",
+                                    "51-60y","61-70y", "71-80y")
+ 
+#  age_group_labels <- c("6-16y","","17-30y", "",
+#                                     "31-40y","", "41-50y","","6-16y","","17-30y", "",
+#                                     "31-40y","", "41-50y","",
+#                                     "51-60y")
+# #   
+df <- melt(df_averted_mean)
 
 # Create heatmap using ggplot2
-ggplot(df, aes(x = Var1, y = Var2, fill = value)) +
-  geom_tile(color = "white", size = 0.1) +  # Add white borders for separation
-  scale_fill_viridis_c(option = "B", name = "Value", direction = -1) +  # Use a visually appealing color gradient
+p <- ggplot(df, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white", size = 0.1) +  # Add white borders for 
+   geom_text(aes(label = floor(value)), color = "black", size = 2)+
+  # geom_text(aes(label = ifelse(value != 0, round(value, 1), "")), color = "black", size = 3) +  # Add numbers for non-zero values
+
+  # Use a diverging color scale to handle negative and positive values
+  scale_fill_gradient2(
+    low = "#a6611a",       # Color for negative values
+    mid = "#ffffbf",      # Color for zero
+    high = "#018571",       # Color for positive values
+    midpoint = 0,       # Define the midpoint as 0 for neutral color
+    name = "Impact (%)" # Label for the legend
+  ) +
   theme_minimal(base_size = 15) +  # Increase base font size for better readability
-  labs(x = "Row", y = "Column", title = "Heatmap of Continuous Data") +
+  
+  labs(x = "Vaccinated age group", y = "Age group", title = "") +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, color = "black", size = 12),
-    axis.text.y = element_text(color = "black", size = 12),
+    axis.text.x = element_text(margin = margin(t = 1),angle = 45, hjust = 1.0, vjust = 1.0, color = "black", size = 12),
+    axis.text.y = element_text(angle = 45, hjust = 1.0, vjust = 1.0, color = "black", size = 12),
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    panel.grid.major = element_blank(),  # Remove gridlines
+    panel.grid.minor = element_blank(),
+    legend.position = "top",  # Position the legend on the right for clarity
+    legend.direction = "horizontal",
+    legend.key.width = unit(1.0, "cm")  # Make the legend key wider for better visibility
+  ) + scale_x_continuous(breaks = 1:7, 
+                         labels = age_group_labels) +
+  scale_y_continuous(breaks = 1:7, 
+                         labels = age_group_labels) +
+   coord_fixed()  # Ensure square tiles
+  
+  
+  p
+}
+
+
+get_cumulative_over_time_age_wise <- function(arr, t_begin, t_end, age_list) {
+  arr_cum_time_age <- apply(arr[, , ,t_begin:t_end], c(1, 2, 3), sum)
+ 
+  arr_cum_age_gr <- array(NA, dim = c(dim(arr)[1], dim(arr)[2], nrow(age_list) ))
+   
+  for (i in 1:nrow(age_list)) {
+
+    arr_cum_age_gr[,,i] <-  apply(arr_cum_time_age[,,age_list[i,1]:age_list[i,2]], c(1, 2), sum)
+
+    
+  }
+  
+  return(arr_cum_age_gr)
+}
+
+
+
+get_averted_age <- function(nv_output, v_output, t_begin, t_end, age_list, output_type){
+  
+  
+  nv_cum_t <- get_cumulative_over_time_age_wise( nv_output, t_begin = t_begin, t_end = t_end, age_list)
+  v_cum_t <- get_cumulative_over_time_age_wise( v_output, t_begin = t_begin, t_end = t_end, age_list)
+  
+  if (output_type == "absolute") {
+  
+  averted <- (nv_cum_t - v_cum_t)
+  }
+  
+  if (output_type == "proportion") {
+  
+    averted <- 100*(nv_cum_t - v_cum_t)/nv_cum_t
+  }
+  
+  # if (output_type == "per_vac") {
+  # 
+  # averted <- 1000*(nv_cum_t - v_cum_t)/tot_new_v_cum_t
+  # }
+  # 
+  
+  return(averted)
+  
+}
+
+
+get_age_list <- function(rds_file) {
+  
+  result <- readRDS(here::here("model_output",  rds_file) )
+  
+  age_list <- result$v_age_list
+  
+  return(age_list)
+}
+
+
+age_list <- get_age_list(rds_file ="detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" )
+  
+
+nv_symp <- extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" , 
+                            variable_name = "symp_sample_age_v") +
+  extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" , 
+                            variable_name = "symp_sample_age") 
+
+
+
+v_symp <- extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "symp_sample_age_v") +
+   extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "symp_sample_age") 
+
+## to get rid of small number which will create large number when we divide to get the proportion
+# nv_symp[nv_symp < 10] <- 0
+# v_symp[v_symp < 10] <- 0
+
+
+
+averted_inc <- get_averted_age(nv_output = nv_symp,
+                                 v_output = v_symp,
+                                 t_begin = 10,
+                                 t_end = 19,
+                                 age_list = age_list,
+                                 output_type = "absolute")
+
+
+averted_inc_mean <-  apply(averted_inc, c(1, 3), mean)
+averted_inc_mean[is.nan(averted_inc_mean)] <- 0 
+
+
+symp_averted_matrix_plot <- get_plot_averted_matrix (df_averted_mean = (averted_inc_mean))
+
+symp_averted_matrix_plot
+
+```
+### with and without efficacy against infection
+```{r}
+get_averted_per_vac <- function(nv_output, v_output, total_vac_output,  t_begin, t_end){
+  
+  nv_agg_age <- get_agg_over_age(nv_output)
+  v_agg_age <-  get_agg_over_age(v_output)
+  total_vac_agg_age <- get_agg_over_age(total_vac_output)
+  
+  nv_cum_t <- get_cumulative_over_time( nv_agg_age, t_begin = t_begin, t_end = t_end)
+  v_cum_t <- get_cumulative_over_time( v_agg_age, t_begin = t_begin, t_end = t_end)
+  total_vac_cum_t <- get_cumulative_over_time(total_vac_agg_age, t_begin = t_begin, t_end = t_end)
+    averted_per_vac <- 1000*(nv_cum_t - v_cum_t)/total_vac_cum_t
+
+
+  
+  return(averted_per_vac)
+  
+}
+
+
+
+get_plot_averted_per_vac_with_without_effi_inf <- function(df_with_effi_inf, df_without_effi_inf, ylab, figure_name) {
+
+  
+   # Add a column for age groups
+  df_with_effi_inf$age <- 1:nrow(df_with_effi_inf)
+  df_without_effi_inf$age <- 1:nrow(df_without_effi_inf)
+ 
+
+  # Reshape the dataframes to long format
+  df_with_effi_inf_long <- gather(df_with_effi_inf, key = "Realization", value = "Output", -age)
+  df_without_effi_inf_long <- gather(df_without_effi_inf, key = "Realization", value = "Output", -age)
+  
+
+  # Add a column to indicate the vaccine coverage for each dataset
+  df_with_effi_inf_long$efficacy_type <- "With efficacy against infection"
+  df_without_effi_inf_long$efficacy_type <- "Without efficacy against infection"
+  
+  # Combine all datasets into one long dataframe
+  df_long <- bind_rows(df_with_effi_inf_long, df_without_effi_inf_long)
+
+  # Calculate the mean and 95% confidence interval for each age group and vaccine coverage
+  summary_df <- df_long %>%
+    group_by(age, efficacy_type) %>%
+    summarise(
+      mean_output = mean(Output),
+      lower_bound = quantile(Output, 0.025),
+      upper_bound = quantile(Output, 0.975)
+    ) %>%
+    ungroup()
+  
+  
+   
+  # Define colors for different vaccine coverages
+  efficacy_type_colors <- c("With efficacy against infection" = "#8dd3c7", "Without efficacy against infection" = "#fdb462")
+  
+  # Define the dodge position for side-by-side plotting
+  dodge <- position_dodge(width = 0.3)
+  
+  # Plot using ggplot2
+  p <- ggplot(summary_df, aes(x = factor(age), y = mean_output, color = efficacy_type)) +
+     geom_bar(stat = "identity", position = position_dodge(width = 0.75), width = 0.65) +
+    # geom_point(size = 9, position = dodge, shape = 16) +  # Points for the mean with dodge
+    geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound), 
+                  width = 0.0, size = 1.8, position = dodge) +  # Error bars with dodge
+    scale_color_manual(values = efficacy_type_colors, name = "") + 
+    scale_x_discrete(
+      breaks = c(1, 2, 3, 4, 5, 6, 7),   # Set the positions of the x-axis ticks
+      labels = c("6-16", "17-30", "31-40", "41-50", "51-60", "61-70", "71-80")  # Labels for age groups
+    ) +
+    # labs(x = "Age at vaccination", y = ylab, color = NULL) +  # Labels for x and y axes
+    scale_y_continuous(limits = c(NA,120), breaks = seq(0, 120, by = 40)) +  # Define y-axis tick points )+
+    theme_bw() +  # Clean theme
+    theme(
+      axis.ticks.length = unit(0.4, "cm"),        # Increase the length of the ticks
+      axis.ticks = element_line(size = 1.5),      # Increase the thickness of the ticks
+      panel.border = element_rect(color = "black", size = 2),  # Thicker border
+      plot.margin = margin(t=10, r=10, b=20, l=20),
+      axis.text.x = element_text(size = 35, color="black", angle= 0, margin = margin(t = 10, b = 20)),
+      axis.text.y = element_text(size = 35,color="black", margin = margin(r = 10, l = 10)),
+      # axis.title = element_text(size = 35, color = "black"),
+      axis.title = element_blank(),
+      legend.position = "top",
+      legend.direction = "horizontal",
+      legend.text = element_text(size = 40),
+      legend.key.size = unit(2, "cm"),  # Increase size of legend keys
+      legend.key.height = unit(1.5, "cm"),  # Increase height of legend keys
+      legend.key.width = unit(2.5, "cm"),  # Increase width of legend keys
+      legend.background = element_blank()
+    )
+  
+
+
+ }
+
+
+
+t_begin <- readRDS(here::here("model_output",  "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds") )$v_year 
+
+t_end = t_begin +9
+
+
+
+# total
+
+nv_total <- extract_variable(rds_file = "detailed_a7_sero_dom_denv2_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" ,
+                            variable_name = "symp_sample_age") +
+           extract_variable(rds_file = "detailed_a7_sero_dom_denv2_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+                            variable_name = "symp_sample_age_v")
+
+new_vac_total <- extract_variable(rds_file = "detailed_a7_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "new_vac_sample_age")
+
+# ## seronegative
+v_with_effi_inf <- extract_variable(rds_file = "effi_inf_detailed_a7_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds" ,
+                            variable_name = "symp_sample_age") +
+           extract_variable(rds_file = "effi_inf_detailed_a7_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                            variable_name = "symp_sample_age_v")
+
+v_without_effi_inf <- extract_variable(rds_file = "detailed_a7_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "symp_sample_age") +
+           extract_variable(rds_file = "detailed_a7_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                            variable_name = "symp_sample_age_v")
+
+averted_per_vac_with_effi_inf <- get_averted_per_vac(nv_output = nv_total,
+                               v_output = v_with_effi_inf,
+                               total_vac_output = new_vac_total,
+                               t_begin = t_begin,
+                               t_end = t_end)
+
+averted_per_vac_without_effi_inf <- get_averted_per_vac(nv_output = nv_total,
+                               v_output = v_without_effi_inf,
+                               total_vac_output = new_vac_total,
+                               t_begin = t_begin,
+                               t_end = t_end)
+
+
+df_averted_per_vac_with_effi_inf <- as.data.frame(averted_per_vac_with_effi_inf)
+
+df_averted_per_vac_without_effi_inf <- as.data.frame(averted_per_vac_without_effi_inf)
+
+
+averted_plot_per_vac <- get_plot_averted_per_vac_with_without_effi_inf(
+                                      df_with_effi_inf  = df_averted_per_vac_with_effi_inf,
+                                      df_without_effi_inf = df_averted_per_vac_without_effi_inf,
+                                      ylab = "Reported cases averted \nper 10000 vaccinated" , 
+                                      figure_name = "avert_cases_per_10k.jpg")
+averted_plot_per_vac
+
+```
+
+
+### average(over time) avearted cases per 1k vaccinated individual in that particular age group
+```{r}
+
+get_plot_averted_matrix <- function(df_averted_mean) {
+
+ #
+ age_group_labels <- c("6-16y","17-30y",
+                                    "31-40y","41-50y",
+                                    "51-60y","61-70y", "71-80y")
+
+
+ # age_group_labels <- c("6-16y","","17-30y", "",
+ #                                    "31-40y","", "41-50y","","6-16y","","17-30y", "",
+ #                                    "31-40y","", "41-50y","",
+ #                                    "51-60y")
+
+df <- melt(df_averted_mean)
+
+# Create heatmap using ggplot2
+p <- ggplot(df, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white", size = 0.1) +  # Add white borders for
+  geom_text(aes(label = ifelse(value != 0, round(value, 1), "")), color = "black", size = 3) +  # Add numbers for non-zero values
+
+  # Use a diverging color scale to handle negative and positive values
+  scale_fill_gradient2(
+    low = "#a6611a",       # Color for negative values
+    mid = "#ffffbf",      # Color for zero
+    high = "#018571",       # Color for positive values
+    midpoint = 0,       # Define the midpoint as 0 for neutral color
+    name = "Impact (%)" # Label for the legend
+  ) +
+  theme_minimal(base_size = 15) +  # Increase base font size for better readability
+
+  labs(x = "Vaccinated age group", y = "Age group", title = "") +
+  theme(
+    axis.text.x = element_text(margin = margin(t = 1),angle = 45, hjust = 1.0, vjust = 1.0, color = "black", size = 12),
+    axis.text.y = element_text(angle = 45, hjust = 1.0, vjust = 1.0, color = "black", size = 12),
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    panel.grid.major = element_blank(),  # Remove gridlines
+    panel.grid.minor = element_blank(),
+    legend.position = "top",  # Position the legend on the right for clarity
+    legend.direction = "horizontal",
+    legend.key.width = unit(1.0, "cm")  # Make the legend key wider for better visibility
+  ) + scale_x_continuous(breaks = 1:7,
+                         labels = age_group_labels) +
+  scale_y_continuous(breaks = 1:7,
+                         labels = age_group_labels) +
+   coord_fixed()  # Ensure square tiles
+
+
+  p
+}
+
+
+
+get_cumulative_age_wise <- function(arr, age_list) {
+
+
+  arr_cum_age_gr <- array(NA, dim = c(dim(arr)[1], dim(arr)[2], nrow(age_list), dim(arr)[4] ))
+
+  for (i in 1:nrow(age_list)) {
+
+    arr_cum_age_gr[,,i,] <-  apply(arr[,,age_list[i,1]:age_list[i,2], ], c(1, 2,4), sum)
+
+
+  }
+
+  return(arr_cum_age_gr)
+}
+
+
+get_averted_age <- function(nv_output, v_output, vaccinated_output, t_begin, t_end, age_list, output_type){
+
+
+  nv_cum_t <- get_cumulative_age_wise( nv_output, age_list)
+  v_cum_t <- get_cumulative_age_wise( v_output, age_list)
+  vaccinated_cum_t <- get_cumulative_age_wise( vaccinated_output, age_list)
+
+
+
+
+  if (output_type == "absolute") {
+
+  averted <- (nv_cum_t - v_cum_t)
+  }
+
+  if (output_type == "proportion") {
+
+    averted <- 100*(nv_cum_t - v_cum_t)/nv_cum_t
+  }
+
+  if (output_type == "per_vac") {
+
+  averted1 <- vaccinated_cum_t #1*(0*nv_cum_t + v_cum_t)/1 #vaccinated_cum_t
+
+
+
+# Replace Inf and -Inf with 0
+averted1[is.infinite(averted1)] <- 0
+averted1[is.nan(averted1)] <- 0
+#
+
+
+  averted <- apply(averted1[,,,t_begin:t_end], c(1,2,3), mean)
+  }
+
+
+  # get_average_averted_per_vac <- function(averted){
+  #
+  #   average_averted <- apply(averted[,,,t_begin:t_end], c(1,2,3), mean)
+  # }
+
+
+  return(averted)
+
+}
+
+
+get_age_list <- function(rds_file) {
+
+  result <- readRDS(here::here("model_output",  rds_file) )
+
+  age_list <- result$v_age_list
+
+  return(age_list)
+}
+
+
+age_list <- get_age_list(rds_file ="detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" )
+
+
+nv_symp <- extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" ,
+                            variable_name = "symp_sample_age_v") +
+  0*extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" ,
+                            variable_name = "symp_sample_age")
+
+
+
+v_symp <- extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "symp_sample_age_v") +
+  0*extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "symp_sample_age")
+
+
+vaccinated <- extract_variable(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "tot_pop_sample_age_v")
+
+## to get rid of small number which will create large number when we divide to get the proportion
+# nv_symp[nv_symp < 1] <- 0
+# v_symp[v_symp < 1] <- 0
+vaccinated[vaccinated < 10] <- 0
+
+
+
+averted_inc <- get_averted_age(nv_output = nv_symp,
+                                 v_output = v_symp,
+                                 vaccinated_output = vaccinated,
+                                 t_begin = 10,
+                                 t_end = 19,
+                                 age_list = age_list,
+                                 output_type = "per_vac")
+
+
+averted_inc_mean <-  apply(averted_inc, c(1, 3), mean)
+averted_inc_mean[is.nan(averted_inc_mean)] <- 0
+
+
+symp_averted_matrix_plot <- get_plot_averted_matrix (df_averted_mean = (averted_inc_mean))
+
+symp_averted_matrix_plot
+
+```
+
+
+
+
+### Population vs individual protection
+
+
+
+
+```{r}
+
+get_averted_indv <- function(nv_output, v_output, vac_output, t_begin, t_end, output_type){
+  
+  nv_agg_age <- get_agg_over_age(nv_output)
+  v_agg_age <-  get_agg_over_age(v_output)
+  vac_agg_age <- get_agg_over_age(vac_output)
+  
+  nv_cum_t <- get_cumulative_over_time( nv_agg_age, t_begin = t_begin, t_end = t_end)
+  v_cum_t <- get_cumulative_over_time( v_agg_age, t_begin = t_begin, t_end = t_end)
+  vac_cum_t <- get_cumulative_over_time( vac_agg_age, t_begin = t_begin, t_end = t_end) #vac_agg_age[,,t_end]
+  
+  if (output_type == "per_1k_vac") {
+    averted <- 1000*(nv_cum_t - v_cum_t)/vac_cum_t
+  }
+  
+  if (output_type == "absolute") {
+  
+  averted <- (nv_cum_t - v_cum_t)
+  }
+  
+  if (output_type == "proportion") {
+  
+    averted <- 100*(nv_cum_t - v_cum_t)/nv_cum_t
+   }
+  
+  
+  return(averted)
+  
+}
+
+
+
+get_plot_popl_vs_indv_impact <- function(df_indv, df_popl, ylab, figure_name){
+  
+# Add a column for age groups
+df_indv$age <- 1:nrow(df_indv)
+df_popl$age <- 1:nrow(df_popl)
+
+# Reshape the dataframes to long format
+df_long_indv <- gather(df_indv, key = "Realization", value = "Output", -age)
+df_long_popl <- gather(df_popl, key = "Realization", value = "Output", -age)
+
+
+# Add a column to indicate the vaccine coverage for each dataset
+df_long_indv$type <- "Individual level"
+df_long_popl$type <- "Population level"
+
+
+# Combine all datasets into one long dataframe
+df_long <- bind_rows(df_long_indv, df_long_popl)
+
+# Calculate the mean and 95% confidence interval for each age group and vaccine coverage
+summary_df <- df_long %>%
+  group_by(age, type) %>%
+  summarise(
+    mean_output = mean(Output),
+    lower_bound = quantile(Output, 0.025),
+    upper_bound = quantile(Output, 0.975)
+  ) %>%
+  ungroup()
+
+# Define colors for bars and their darker versions for error bars
+bar_colors <- c("Individual level" = "#66c2a5", "Population level" = "#fc8d62")
+errorbar_colors <- c("Individual level" = "#1b7a53", "Population level" = "#d94e28")
+
+
+# Plot using ggplot2 with a clean, professional style
+p <- ggplot(summary_df, aes(x = factor(age), y = mean_output, fill = type)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.75), width = 0.65) +
+  geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound, color = type), 
+                width = 0.0, size = 0.8, position = position_dodge(width = 0.75)) +
+  scale_fill_manual(values = bar_colors) + # Custom colors for bars
+  scale_color_manual(values = errorbar_colors) + # Custom colors for error bars
+    scale_x_discrete(
+      breaks = c(1, 2, 3, 4, 5),   # Set the positions of the x-axis ticks
+      labels = c("6-16y", "17-60y", "50y+", "60y+", "70y+")  # Labels for age groups
+    ) +  # Set the labels for the ticks
+  
+   
+  # scale_x_discrete(
+  #   breaks = c(1, 3, 5, 7, 9, 11, 13, 15, 17 ),       # Set the positions of the y-axis ticks
+  #   labels = c("0-4y","10-14y","20-24y","30-34y", "40-44y", "50-54y", 
+  #              "60-64y", "70-74y", "80-84y") ) +  # Set the labels for the ticks
+  # 
+  scale_y_continuous(labels = scales::comma, 
+                     ,
+  breaks = c(-150, -100, -50, 0, 50) ) + # Non-scientific y-axis labels
+  coord_cartesian(ylim = c(NA,75)) +
+  labs(x = "Age at vaccination", y = ylab, 
+       title = "") +
+  theme_bw() + # Classic theme for a clean look
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5, size = 25, 
+                                   margin = margin(t = 0, b = 5), 
+                                   face = "plain", color = "black"),
+        axis.text.y = element_text(angle = 90, hjust = 0.5, size = 25, 
+                                   margin = margin(r = 0, l = 5), 
+                                   face="plain", color = "black"), # Vertical y-axis labels
+        axis.title = element_text(size = 25, face = "plain"),
+        legend.position = "top",
+        legend.direction = "horizontal",
+        legend.title = element_blank(), # No legend title for simplicity
+        legend.text = element_text(size = 19, face="plain"),
+        legend.key.size = unit(0.8, "cm"),
+        legend.background = element_blank()) + 
+ # Override the default shape in the legend
+  guides(color = guide_legend(override.aes = list(shape = NA, linetype = 1, size = 1.5)))
+  
+
+p
+
+ggsave(
+  filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
+  plot = p,                                            # The plot object to save
+  width = 18,                                           # Width in inches
+  height = 18,                                          # Height in inches
+  dpi = 300,
+  units = "cm")                                  # DPI (resolution)
+
+
+}
+```
+
+
+```{r}
+
+t_begin = 15
+t_end = 25
+
+
+
+
+
+
+
+### VCD
+# nv_symp_indv <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_yes_lb_-Inf_ve_scenario_optimistic.rds" ,
+#                             variable_name = "symp_sample_age_v")
+# 
+# v_symp_indv <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+#                               variable_name = "symp_sample_age_v")
+# 
+# 
+# tot_vac_indv <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+#                               variable_name = "new_vac_sample_age")
+
+
+
+####  hospitalization individual
+
+nv_symp_indv <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_yes_lb_-Inf_ve_scenario_optimistic.rds" ,
+                            variable_name = "hosp_sample_age_v")
+
+v_symp_indv <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+                              variable_name = "hosp_sample_age_v")
+
+
+tot_vac_indv <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+                              variable_name = "new_vac_sample_age")
+
+averted_indv <- get_averted_indv(nv_output = nv_symp_indv,
+                            v_output = v_symp_indv,
+                            vac_output = tot_vac_indv,
+                            t_begin = t_begin,
+                            t_end = t_end,
+                            output_type = "proportion"
+                              )
+
+df_indv <- as.data.frame(averted_indv)
+
+
+### VCD POPULATION
+
+# nv_symp_popl <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_yes_lb_-Inf_ve_scenario_optimistic.rds" ,
+#                             variable_name = "symp_sample_age") +
+#   extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_yes_lb_-Inf_ve_scenario_optimistic.rds" ,
+#                             variable_name = "symp_sample_age_v")
+# 
+# v_symp_popl <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+#                               variable_name = "symp_sample_age") +
+#   extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+#                               variable_name = "symp_sample_age_v")
+
+
+### hosp populatiom
+
+nv_symp_popl <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_yes_lb_-Inf_ve_scenario_optimistic.rds" ,
+                            variable_name = "hosp_sample_age") +
+  extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_yes_lb_-Inf_ve_scenario_optimistic.rds" ,
+                            variable_name = "hosp_sample_age_v")
+
+v_symp_popl <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+                              variable_name = "hosp_sample_age") +
+  extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+                              variable_name = "hosp_sample_age_v")
+
+
+averted_popl <- get_averted_indv(nv_output = nv_symp_popl,
+                            v_output = v_symp_popl,
+                            vac_output = tot_vac_indv,
+                            t_begin = t_begin,
+                            t_end = t_end,
+                            output_type = "proportion"
+                              )
+
+df_popl <- as.data.frame(averted_popl)
+
+
+popl_vs_indv_plot <- get_plot_popl_vs_indv_impact(
+                                      df_indv = df_indv,
+                                      df_popl = df_popl,
+                                      # ylab = "Reported cases averted \nper 1000 FVP" ,
+                                       ylab = "Hospitalization averted (%)" ,
+                                      figure_name = "pop_vs_indv_hosp.jpg")
+
+popl_vs_indv_plot
+
+```
+
+
+
+
+
+
+
+
+
+
+
+## Serotype share
+
+```{r}
+extract_variable_sero <- function(rds_file, variable_name) {
+  
+result <- readRDS(here::here("model_output",  rds_file) )
+
+out_v <- as.data.frame(result$output, stringsAsFactors = FALSE)
+
+
+
+n_sample = result$n_sample
+n_sero = result$n_sero
+n_year = result$n_year
+n_vac_age = result$n_vac_age
+
+  x <- out_v[,colnames(out_v) == variable_name] 
+  
+  y <- array(NA, dim = c(n_vac_age,n_sample,n_sero, n_year))
+  
+  for (i in 1:n_vac_age) {
+  
+  y[i,,,] <- x[[paste0("result.", i)]]
+  }
+  
+  return(y)
+}
+
+
+
+
+
+get_aggregated_sero_share_plot <- function(df_inf, t_begin, t_end){
+
+## select only one scenario and one sample as the infection will remain same
+inf_sero_select <- df_inf[1,1,,t_begin:t_end]
+
+# Calculate the percentage of infection for each serotype
+# total_infection <- rowSums(inf_sero_select)
+percentage_vector <- 100*rowSums(inf_sero_select)/sum(inf_sero_select)
+
+serotypes <- paste("DENV", 1:4, sep = "-")
+
+df <- data.frame(
+                 serotype = serotypes,
+                 percentage = percentage_vector)
+# Plot stacked area plot using ggplot2 with improved aesthetics
+ggplot(df, aes(x = serotype, y = percentage, fill = serotype)) +
+  geom_bar(stat = "identity", position = "stack", width = 0.8, alpha = 0.9) +  # Stacked bar plot
+  labs(title = "",
+       x = "Serotype", y = "Percentage of infection") +
+  # Manually defining colors for the four serotypes
+  scale_fill_manual(values = c("DENV-1" = "#8da0cb",   # Tomato
+                               "DENV-2" = "#e78ac3",   # SteelBlue
+                               "DENV-3" = "#a6d854",   # LimeGreen
+                               "DENV-4" = "#ffd92f")) + # Gold
+  theme_minimal() + # Classic theme for a clean look
+  theme(
+    panel.grid.major = element_blank(),  # Remove major gridlines
+    panel.grid.minor = element_blank(),  # Remove minor gridlines
+    axis.text.x = element_text(angle = 0, hjust = 0.5, size = 14, 
+                               margin = margin(t = 0, b = 5), 
+                               face = "plain", color = "black"),
+    axis.text.y = element_text(angle = 90, hjust = 0.5, size = 14, 
+                               margin = margin(r = 0, l = 5), 
+                               face="plain", color = "black"), # Vertical y-axis labels
+    axis.title = element_text(size = 16, face = "plain"),
+    legend.position = "top",
+    legend.direction = "horizontal",
+    legend.title = element_blank(), # No legend title for simplicity
+    legend.text = element_text(size = 16, face="plain"),
+    legend.key.size = unit(0.8, "cm"),
+    legend.background = element_blank()
+  )
+
+}
+
+
+
+inf_sero <- extract_variable_sero(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+                              variable_name = "inf_sample_sero") +
+  extract_variable_sero(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+                              variable_name = "inf_sample_sero_v") 
+
+v_year <- readRDS(here::here("model_output",  "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds") )$v_year
+
+sero_share_plot <- get_aggregated_sero_share_plot(df_inf = inf_sero, t_begin = v_year, t_end = v_year + 9 )
+
+sero_share_plot
+```
+
+
+
+
+```{r}
+get_sero_share_plot <- function(df_inf, t_begin, t_end){
+
+## select only one scenario and one sample as the infection will remain same
+inf_sero_select <- df_inf[1,1,,t_begin:t_end]
+
+# Calculate the percentage of infection for each serotype
+total_infection <- colSums(inf_sero_select)
+percentage_matrix <- 100*t(t(inf_sero_select) / total_infection)
+#e41a1c
+#377eb8
+#4daf4a
+#984ea3
+# Convert matrix to data frame for plotting
+years <- 0:(t_end-t_begin)
+# serotypes <- c("DENV-1","DENV-2","DENV-3","DENV-3")
+serotypes <- paste("DENV", 1:4, sep = "-")
+
+df <- data.frame(year = rep(years, each = 4),
+                 serotype = factor(rep(serotypes, times = ( (t_end - t_begin) + 1) )),
+                 percentage = as.vector(percentage_matrix))
+# Plot stacked area plot using ggplot2 with improved aesthetics
+ggplot(df, aes(x = year, y = percentage, fill = serotype)) +
+  geom_bar(stat = "identity", position = "stack", width = 0.8, alpha = 0.9) +  # Stacked bar plot
+  # geom_area(alpha = 0.85) +  # Increasing transparency slightly
+  # geom_vline(xintercept = v_year, linetype = "dashed", color = "white", size = 1) +  # Adding white vertical line
+  # geom_vline(xintercept = v_year+10, linetype = "dashed", color = "white", size = 1) +  # Adding white vertical line
+  # 
+  # # # Add annotation for the x-axis label corresponding to the vertical line
+  # annotate("text", x = v_year, y = 105, label = "vac. start", size = 5, color = "black", hjust = 0.5) +  # Adjust y and size as needed
+  #  annotate("text", x = v_year+10, y = 105, label = "vac. end", size = 5, color = "black", hjust = 0.5) + 
+
+  labs(title = "",
+       x = "Year", y = "Percentage of infection") +
+  # Manually defining colors for the four serotypes
+  scale_fill_manual(values = c("DENV-1" = "#8da0cb",   # Tomato
+                               "DENV-2" = "#e78ac3",   # SteelBlue
+                               "DENV-3" = "#a6d854",   # LimeGreen
+                               "DENV-4" = "#ffd92f")) + # Gold
+  theme_minimal() + # Classic theme for a clean look
+  theme(
+    panel.grid.major = element_blank(),  # Remove major gridlines
+    panel.grid.minor = element_blank(),  # Remove minor gridlines
+    axis.text.x = element_text(angle = 0, hjust = 0.5, size = 14, 
+                               margin = margin(t = 0, b = 5), 
+                               face = "plain", color = "black"),
+    axis.text.y = element_text(angle = 90, hjust = 0.5, size = 14, 
+                               margin = margin(r = 0, l = 5), 
+                               face="plain", color = "black"), # Vertical y-axis labels
+    axis.title = element_text(size = 16, face = "plain"),
+    legend.position = "top",
+    legend.direction = "horizontal",
+    legend.title = element_blank(), # No legend title for simplicity
+    legend.text = element_text(size = 16, face="plain"),
+    legend.key.size = unit(0.8, "cm"),
+    legend.background = element_blank()
+  )
+
+}
+
+
+
+inf_sero <- extract_variable_sero(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+                              variable_name = "inf_sample_sero") +
+  extract_variable_sero(rds_file = "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+                              variable_name = "inf_sample_sero_v") 
+
+v_year <- readRDS(here::here("model_output",  "detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds") )$v_year
+
+sero_share_plot <- get_sero_share_plot(df_inf = inf_sero, t_begin = v_year, t_end = v_year + 9 )
+
+sero_share_plot
+```
+
+
+
+
+
+
+
+
+##### Time to impact 
+
+```{r}
+
+get_plot_averted_matrix <- function(df_averted_mean) {
+
+  
+ age_group_labels <- c("6-16y","17-30y",
+                        "31-40y","41-50y",
+                        "51-60y", "61-70y",
+                        "71-80y")  
+df <- melt(df_averted_mean)
+
+# Create heatmap using ggplot2
+p <- ggplot(df, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white", size = 0.1) +  # Add white borders for 
+  # Use a diverging color scale to handle negative and positive values
+  scale_fill_gradient2(
+    low = "#a6611a",       # Color for negative values
+    mid = "#ffffbf",      # Color for zero
+    high = "#018571",       # Color for positive values
+    midpoint = 50,       # Define the midpoint as 0 for neutral color
+    name = "Impact (%)" # Label for the legend
+  ) +
+  
+  
+  # scale_fill_viridis_c(option = "B", name = "Impact (%)", direction = -1) +  # Use a visually appealing color gradient
+  theme_minimal(base_size = 15) +  # Increase base font size for better readability
+  
+  labs(x = "Vaccinated age group", y = "Age group", title = "") +
+  theme(
+    axis.text.x = element_text(margin = margin(t = 1),angle = 45, hjust = 1.0, vjust = 1.0, color = "black", size = 12),
+    axis.text.y = element_text(angle = 45, hjust = 1.0, vjust = 1.0, color = "black", size = 12),
     plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
     panel.grid.major = element_blank(),  # Remove gridlines
     panel.grid.minor = element_blank(),
     legend.position = "right",  # Position the legend on the right for clarity
-    legend.key.width = unit(1.5, "cm")  # Make the legend key wider for better visibility
-  )
+    legend.key.width = unit(1.0, "cm")  # Make the legend key wider for better visibility
+  ) + scale_x_continuous(breaks = 1:7, 
+                         labels = age_group_labels) +
+  scale_y_continuous(breaks = 1:7, 
+                         labels = age_group_labels) +
+   coord_fixed()  # Ensure square tiles
+  
+  
+  p
+}
+
+
+get_cumulative_age_wise <- function(arr, age_list) {
+
+ 
+  arr_cum_age_gr <- array(NA, dim = c(dim(arr)[1], dim(arr)[2], nrow(age_list), dim(arr)[4] ))
+   
+  for (i in 1:nrow(age_list)) {
+
+    arr_cum_age_gr[,,i,] <-  apply(arr[,,age_list[i,1]:age_list[i,2], ], c(1, 2,4), sum)
+
+    
+  }
+  
+  return(arr_cum_age_gr)
+}
+
+
+get_averted_age <- function(nv_output, v_output, age_list, output_type, t_begin, t_end){
+  
+  
+  nv_cum_t <- get_cumulative_age_wise( nv_output, age_list)
+  v_cum_t <- get_cumulative_age_wise( v_output, age_list)
+  
+  nv_cum <- get_cumulative_over_time(arr = nv_cum_t, t_begin = t_begin,
+                                     t_end = t_end)
+  
+  v_cum <- get_cumulative_over_time(arr = v_cum_t, t_begin = t_begin,
+                                     t_end = t_end)
+  
+  
+  if (output_type == "absolute") {
+  
+  averted <- (nv_cum - v_cum)
+  }
+  
+  if (output_type == "proportion") {
+  
+    averted <- 100*(nv_cum - v_cum)/nv_cum
+   }
+  
+  
+  return(averted)
+  
+}
+
+
+get_age_list <- function(rds_file) {
+  
+  result <- readRDS(here::here("model_output",  rds_file) )
+  
+  age_list <- result$v_age_list
+  
+  return(age_list)
+}
+
+
+age_list <- get_age_list(rds_file ="detailed_a7_sero_dom_denv3_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" )
+
+
+
+nv_symp <- extract_variable(rds_file = "detailed_a7_sero_dom_denv3_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" ,
+                            variable_name = "symp_sample_age_v")
+
+v_symp <- extract_variable(rds_file = "detailed_a7_sero_dom_denv3_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "symp_sample_age_v")
+
+
+t_begin = 10
+t_end = 19
+
+averted_inc <- get_averted_age(nv_output = nv_symp,
+                                 v_output = v_symp,
+                                 age_list = age_list,
+                                 output_type = "proportion",
+                               t_begin = t_begin,
+                               t_end = t_end)
+
+averted_inc_mean <-  apply(averted_inc, c(1, 3), mean)
+
+
+symp_averted_matrix_plot <- get_plot_averted_matrix (df_averted_mean = (averted_inc_mean))
+
+symp_averted_matrix_plot
+
+# 
+#  plot(averted_inc[1,1,1,]) +
+# lines(averted_inc[2,1,2,]) +
+#    lines(averted_inc[3,1,3,]) +
+#    lines(averted_inc[4,1,4,]) +
+#    lines(averted_inc[5,1,5,]) +
+#    lines(averted_inc[6,1,6,]) +
+#    lines(averted_inc[7,1,7,]) +
+#    lines(averted_inc[8,1,8,]) +
+
+```
+### sero positive sero negative
+```{r}
+
+get_averted_sero_status_wise <- function(nv_output, v_output, vac_output, t_begin, t_end, output_type){
+  
+  nv_agg_age <- get_agg_over_age(nv_output)
+  v_agg_age <-  get_agg_over_age(v_output)
+  vac_agg_age <- get_agg_over_age(vac_output)
+  
+  nv_cum_t <- get_cumulative_over_time( nv_agg_age, t_begin = t_begin, t_end = t_end)
+  v_cum_t <- get_cumulative_over_time( v_agg_age, t_begin = t_begin, t_end = t_end)
+  vac_cum_t <- get_cumulative_over_time( vac_agg_age, t_begin = t_begin, t_end = t_end) #vac_agg_age[,,t_end]
+  
+  if (output_type == "per_1k_vac") {
+    averted <- 10000*(nv_cum_t - v_cum_t)/(vac_cum_t)
+  }
+  
+  if (output_type == "absolute") {
+  
+  averted <- (nv_cum_t - v_cum_t)
+  }
+  
+  if (output_type == "proportion") {
+  
+    averted <- 100*(nv_cum_t - v_cum_t)/nv_cum_t
+   }
+  
+  
+  return(averted)
+  
+}
+
+
+
+get_plot_seron_vs_serop_impact <- function(df_seron, df_serop, ylab, figure_name){
+  
+# Add a column for age groups
+df_seron$age <- 1:nrow(df_seron)
+df_serop$age <- 1:nrow(df_serop)
+
+# Reshape the dataframes to long format
+df_long_seron <- gather(df_seron, key = "Realization", value = "Output", -age)
+df_long_serop <- gather(df_serop, key = "Realization", value = "Output", -age)
+
+
+# Add a column to indicate the vaccine coverage for each dataset
+df_long_seron$type <- "Seronegative"
+df_long_serop$type <- "Seropositive"
+
+
+# Combine all datasets into one long dataframe
+df_long <- bind_rows(df_long_seron, df_long_serop)
+
+# Calculate the mean and 95% confidence interval for each age group and vaccine coverage
+summary_df <- df_long %>%
+  group_by(age, type) %>%
+  summarise(
+    mean_output = mean(Output),
+    lower_bound = quantile(Output, 0.025),
+    upper_bound = quantile(Output, 0.975)
+  ) %>%
+  ungroup()
+
+dodge <- position_dodge(width = 0.3)
+
+ # sero_colors <- c("Seronegative" = "#1f78b4", "Seropositive" = "#ca0020")
+ # c("20% Coverage" = "#1b7a53", "50% Coverage" = "#d94e28", "80% Coverage" = "#4a5a92")
+
+ 
+bar_colors <- c("Seronegative" = "#bf812d", "Seropositive" = "#c2a5cf")
+errorbar_colors <- c("Seronegative" = "#8c510a", "Seropositive" = "#762a83")
+
+ 
+ 
+# Plot using ggplot2 with a clean, professional style
+p <- ggplot(summary_df, aes(x = factor(age), y = mean_output, fill = type)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.75), width = 0.65) +
+  geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound, color = type), 
+                width = 0.0, size = 0.8, position = position_dodge(width = 0.75)) +
+    scale_fill_manual(values = bar_colors) + # Custom colors for bars
+    scale_color_manual(values = errorbar_colors) + # Custom colors for error bars
+     # geom_point(size = 4, position = dodge, shape=16) +
+      # geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound),
+      #             width = 0.0, size = 1.1, position = dodge) +  # Error bars with dodge
+    # scale_color_manual(values = sero_colors) +
+
+  scale_x_discrete(
+      breaks = c(1, 2, 3, 4, 5),   # Set the positions of the x-axis ticks
+      labels = c("6-16y", "17-60y", "50y+", "60y+", "70y+")  # Labels for age groups
+    ) +  # Set the labels for the ticks
+  
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  scale_y_continuous(labels = scales::comma) + # Non-scientific y-axis labels
+  # scale_y_continuous(breaks = c(-75,-50,-25,0, 25,50),  # Define where the ticks should be
+  #        labels = c("-75","-50", "-25","0", "25", "50") ) + # Define the custom labels
+  # 
+  # coord_cartesian(ylim = c(-80,50)) +
+  labs(x = "Age at vaccination", y = ylab, 
+       title = "") +
+ theme_bw() +  # Clean theme
+    theme(
+      axis.text.x = element_text(size = 25, color="black", margin = margin(t = 0, b = 5)),
+      axis.text.y = element_text(size = 25,color="black", margin = margin(r = 0, l = 5)),
+      axis.title = element_text(size = 25),
+      legend.position = "top",
+      legend.direction = "horizontal",
+      legend.title = element_blank(),
+      legend.text = element_text(size = 19),
+      legend.key.size = unit(0.8, "cm"),
+      legend.background = element_blank()
+    )
+
+p
+  
+
+# ggsave(
+#   filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
+#   plot = p,                                            # The plot object to save
+#   width = 18,                                           # Width in inches
+#   height = 18,                                          # Height in inches
+#   dpi = 300,
+#   units = "cm")                                  # DPI (resolution)
+
+
+
+
+}
 
 
 
 
 ```
+
+
+```{r}
+
+t_begin = 15
+t_end = 25
+
+
+### FOR cases
+nv_seron <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_yes_lb_-Inf_ve_scenario_optimistic.rds" ,
+                            variable_name = "symp_sample_age_primary") +
+   extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_yes_lb_-Inf_ve_scenario_optimistic.rds" ,
+                            variable_name = "symp_sample_age_v_primary")
+
+v_seron <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+                              variable_name = "symp_sample_age_primary") +
+  extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+                              variable_name = "symp_sample_age_v_primary")
+
+
+## for hospitalization
+
+# nv_seron <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_yes_lb_-Inf_ve_scenario_optimistic.rds" ,
+#                             variable_name = "hosp_sample_age_primary") +
+#    extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_yes_lb_-Inf_ve_scenario_optimistic.rds" ,
+#                             variable_name = "hosp_sample_age_v_primary")
+# 
+# v_seron <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+#                               variable_name = "hosp_sample_age_primary") +
+#   extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+#                               variable_name = "hosp_sample_age_v_primary")
+# # 
+# tot_vac_seron <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+#                               variable_name = "new_vac_sample_age_primary")
+
+# tot_vac_seron <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+#                               variable_name = "new_vac_sample_age")
+
+
+
+averted_seron <- get_averted_sero_status_wise(nv_output = nv_seron,
+                            v_output = v_seron,
+                            vac_output = tot_vac_seron,
+                            t_begin = t_begin,
+                            t_end = t_end,
+                            output_type = "proportion"
+                              )
+
+df_seron <- as.data.frame(averted_seron)
+
+
+### for cases
+# 
+nv_serop <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_yes_lb_-Inf_ve_scenario_optimistic.rds" ,
+                            variable_name = "symp_sample_age_secondary") +
+  extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_yes_lb_-Inf_ve_scenario_optimistic.rds" ,
+                            variable_name = "symp_sample_age_v_secondary")
+
+v_serop <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+                              variable_name = "symp_sample_age_secondary") +
+  extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+                              variable_name = "symp_sample_age_v_secondary")
+# 
+
+## for hosp
+# 
+# nv_serop <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_yes_lb_-Inf_ve_scenario_optimistic.rds" ,
+#                             variable_name = "hosp_sample_age_secondary") +
+#   extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_yes_lb_-Inf_ve_scenario_optimistic.rds" ,
+#                             variable_name = "hosp_sample_age_v_secondary")
+# 
+# v_serop <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+#                               variable_name = "hosp_sample_age_secondary") +
+#   extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+#                               variable_name = "hosp_sample_age_v_secondary")
+# 
+# 
+# tot_vac_serop <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+#                               variable_name = "new_vac_sample_age_secondary")
+
+# 
+# tot_vac_serop <- extract_variable(rds_file = "cum_ve_run_interval_vcov_0.8_nsamp_100_baseline_no_lb_-Inf_ve_scenario_optimistic.rds",
+#                               variable_name = "new_vac_sample_age")
+
+
+averted_serop <- get_averted_sero_status_wise(nv_output = nv_serop,
+                            v_output = v_serop,
+                            vac_output = tot_vac_serop,
+                            t_begin = t_begin,
+                            t_end = t_end,
+                            output_type = "proportion"
+                              )
+
+df_serop <- as.data.frame(averted_serop)
+
+
+
+popl_vs_indv_plot <- get_plot_seron_vs_serop_impact(
+                                      df_seron = df_seron,
+                                      df_serop = df_serop,
+                                      # ylab = "Reported cases averted \nper 1000 FVP" ,
+                                       ylab = "Reported cases averted (%)" ,
+                                      figure_name = "cum_ve_serop_seron_10y_cases_avert.jpg")
+
+popl_vs_indv_plot
+
+```
+
+
+
+
+### waning of efficacy
+```{r}
+
+
+
+
+
+
+
+"detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds"
+
+"detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds"
+
+"detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.05.rds"
+
+"detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.1.rds"
+
+"detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.15.rds"
+
+"detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.2.rds"
+
+"detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.25.rds"
+
+
+```
+
+
+
+### hospitalization rate scenarios
+```{r}
+
+
+
+
+get_averted <- function(nv_output, v_output, t_begin, t_end, output_type){
+  
+  nv_agg_age <- get_agg_over_age(nv_output)
+  v_agg_age <-  get_agg_over_age(v_output)
+  
+  nv_cum_t <- get_cumulative_over_time( nv_agg_age, t_begin = t_begin, t_end = t_end)
+  v_cum_t <- get_cumulative_over_time( v_agg_age, t_begin = t_begin, t_end = t_end)
+  
+  if (output_type == "absolute") {
+  
+  averted <- (nv_cum_t - v_cum_t)
+  }
+  
+  if (output_type == "proportion") {
+  
+    averted <- 100*(nv_cum_t - v_cum_t)/nv_cum_t
+   }
+  
+  
+  return(averted)
+  
+}
+
+
+get_plot_averted_hosp_scenario <- function(df, ylab, figure_name) {
+
+  # Add a column for age groups
+  df$age <- 1:nrow(df)
+  # df_v50$age <- 1:nrow(df_v50)
+  # df_v80$age <- 1:nrow(df_v80)
+
+  # Reshape the dataframes to long format
+  df_long <- gather(df, key = "Realization", value = "Output", -age)
+  # df_v50_long <- gather(df_v50, key = "Realization", value = "Output", -age)
+  # df_v80_long <- gather(df_v80, key = "Realization", value = "Output", -age)
+
+  # Add a column to indicate the vaccine coverage for each dataset
+  # df_v20_long$VaccineCoverage <- "20% Coverage"
+  # df_v50_long$VaccineCoverage <- "50% Coverage"
+  # df_v80_long$VaccineCoverage <- "80% Coverage"
+
+  # Combine all datasets into one long dataframe
+  # df_long <- bind_rows(df_v20_long, df_v50_long, df_v80_long)
+
+  # Calculate the mean and 95% confidence interval for each age group and vaccine coverage
+  summary_df <- df_long %>%
+    group_by(age) %>%
+    summarise(
+      mean_output = mean(Output),
+      lower_bound = quantile(Output, 0.025),
+      upper_bound = quantile(Output, 0.975)
+    ) %>%
+    ungroup()
+
+  # Define colors for different vaccine coverages
+  # vaccine_colors <- c("20% Coverage" = "#1b7a53", "50% Coverage" = "#d94e28", "80% Coverage" = "#4a5a92")
+
+  # Define the dodge position for side-by-side plotting
+  dodge <- position_dodge(width = 0.3)
+
+  # Plot using ggplot2
+  p <- ggplot(summary_df, aes(x = factor(age), y = mean_output)) +
+    geom_point(size = 9, position = dodge, shape=15) +  # Points for the mean with dodge
+    geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound), 
+                  width = 0.0, size = 1.6, position = dodge) +  # Error bars with dodge
+    # scale_color_manual(values = vaccine_colors) + 
+    scale_x_discrete(
+      breaks = c(1, 2, 3, 4, 5, 6, 7),   # Set the positions of the x-axis ticks
+      labels = c("6-16y", "17-30y", "31-40y", "41-50y", "51-60y", "61-70y", "71-80y")  # Labels for age groups
+    ) +
+    scale_y_continuous(labels = scales::comma) +  # Non-scientific y-axis labels
+    labs(x = "Age at vaccination", y = ylab) +  # Labels for x and y axes
+    ylim(c(NA, 16.2))+
+    theme_bw() +  # Clean theme
+    theme(
+      plot.margin = margin(t=0, r=40, b=0, l=0),
+      axis.text.x = element_text(size = 25, color="black", margin = margin(t = 0, b = 5)),
+      axis.text.y = element_text(size = 25,color="black", margin = margin(r = 0, l = 5)),
+      axis.title = element_text(size = 35, color = "black"),
+      # axis.title = element_blank(),
+      # legend.position = "top",
+      legend.position = "none",
+      legend.direction = "horizontal",
+      legend.title = element_blank(),
+      # legend.text = element_text(size = 25),
+      legend.key.size = unit(1, "cm"),
+      legend.background = element_blank()
+    )
+
+  # Print the plot
+  # print(p)
+
+ggsave(
+  filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
+  plot = p,                                            # The plot object to save
+  width = 28,                                           # Width in inches
+  height = 18,                                          # Height in inches
+  dpi = 300,
+  units = "cm")                                  # DPI (resolution)
+
+}
+
+
+
+v_start_year <- readRDS(here::here("model_output",  "pri_sec_neq_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds") )$v_year 
+
+
+nv_symp <- extract_variable(rds_file = "pri_sec_neq_eq_hosp_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" , 
+                            variable_name = "symp_sample_age") + 
+           extract_variable(rds_file = "pri_sec_neq_eq_hosp_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
+                            variable_name = "symp_sample_age_v")
+
+v_symp <- extract_variable(rds_file = "pri_sec_neq_eq_hosp_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "symp_sample_age") + 
+             extract_variable(rds_file = "pri_sec_neq_eq_hosp_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_no_nsamp_100_waning_0.rds", 
+                            variable_name = "symp_sample_age_v")
+
+averted_inc <- get_averted(nv_output = nv_symp,
+                                 v_output = v_symp,
+                                 t_begin = v_start_year,
+                                 t_end = v_start_year + 9,
+                                 output_type = "proportion")
+
+
+
+df <- as.data.frame(averted_inc)
+# df_v50 <- as.data.frame(averted_inc_v50)
+# df_v80 <- as.data.frame(averted_inc_v80)
+
+symp_averted_plot <- get_plot_averted_hosp_scenario(df=df, 
+                           ylab = "Reported cases averted (%)" , figure_name = "hosp_scenario_pei_sec_neq_eq_hosp_denv3_case.jpg")
+
+symp_averted_plot 
+
+
+
+```
+
+
+
+### pre screening for vaccimation
+
+```{r}
+
+
+get_agg_over_age <- function(arr) {
+  arr_agg_age <- apply(arr, c(1,2,4), sum)
+  return(arr_agg_age)
+}
+
+## cumulative number over year
+get_cumulative_over_time <- function(arr, t_begin, t_end) {
+  arr_cum_time <- apply(arr[, , t_begin:t_end], c(1, 2), sum)
+  return(arr_cum_time)
+}
+
+
+
+
+extract_variable <- function(rds_file, variable_name) {
+  
+result <- readRDS(here::here("model_output",  rds_file) )
+
+out_v <- as.data.frame(result$output, stringsAsFactors = FALSE)
+
+n_vac_age = result$n_vac_age
+n_sample = result$n_sample
+n_age = result$n_age
+n_year = result$n_year
+  
+  
+
+  x <- out_v[,colnames(out_v) == variable_name] 
+  
+  y <- array(NA, dim = c(n_vac_age,n_sample, n_age, n_year))
+  
+  for (i in 1:n_vac_age) {
+  
+  y[i,,,] <- x[[paste0("result.", i)]]
+  }
+  
+  return(y)
+}
+
+
+
+get_averted_scrng <- function(nv_output, v_output, t_begin, t_end){
+  
+  nv_agg_age <- get_agg_over_age(nv_output)
+  v_agg_age <- get_agg_over_age(v_output)
+  # v_w_scrng_agg_age <- get_agg_over_age(v_output_w_scrng)
+  # v_agg_age <-  get_agg_over_age(v_output)
+  # total_vac_agg_age <- get_agg_over_age(total_vac_output)
+  
+  nv_cum_t <- get_cumulative_over_time( nv_agg_age, t_begin = t_begin, t_end = t_end)
+  v_cum_t <- get_cumulative_over_time( v_agg_age, t_begin = t_begin, t_end = t_end)
+  # v_wo_scrng_cum_t <- get_cumulative_over_time( v_wo_scrng_agg_age, t_begin = t_begin, t_end = t_end)
+  # total_vac_cum_t <- get_cumulative_over_time(total_vac_agg_age, t_begin = t_begin, t_end = t_end)
+    averted <- 100*(nv_cum_t - v_cum_t)/nv_cum_t
+
+
+  
+  return(averted)
+  
+}
+
+
+
+get_plot_averted_scrng <- function(df_with_scrng, df_without_scrng, ylab, figure_name) {
+
+  
+   # Add a column for age groups
+  df_with_scrng$age <- 1:nrow(df_with_scrng)
+  df_without_scrng$age <- 1:nrow(df_without_scrng)
+ 
+
+  # Reshape the dataframes to long format
+  df_with_scrng_long <- gather(df_with_scrng, key = "Realization", value = "Output", -age)
+  df_without_scrng_long <- gather(df_without_scrng, key = "Realization", value = "Output", -age)
+  
+
+  # Add a column to indicate the vaccine coverage for each dataset
+  df_with_scrng_long$efficacy_type <- "With pre-screening"
+  df_without_scrng_long$efficacy_type <- "Without pre-screening"
+  
+  # Combine all datasets into one long dataframe
+  df_long <- bind_rows(df_with_scrng_long, df_without_scrng_long)
+
+  # Calculate the mean and 95% confidence interval for each age group and vaccine coverage
+  summary_df <- df_long %>%
+    group_by(age, efficacy_type) %>%
+    summarise(
+      mean_output = mean(Output),
+      lower_bound = quantile(Output, 0.025),
+      upper_bound = quantile(Output, 0.975)
+    ) %>%
+    ungroup()
+  
+  
+   
+  # Define colors for different vaccine coverages
+  efficacy_type_barcolors <- c("With pre-screening" = "#8dd3c7", "Without pre-screening" = "#fdb462")
+  efficacy_type_errorbar_colors <- c("With pre-screening" = "#55988e", "Without pre-screening" = "#cc8435")
+  
+  # Define the dodge position for side-by-side plotting
+  dodge <- position_dodge(width = 0.3)
+  
+ 
+  
+  # Plot using ggplot2
+  p <- ggplot(summary_df, aes(x = factor(age), y = mean_output, color = efficacy_type)) +
+     geom_bar(stat = "identity", position = position_dodge(width = 0.75), width = 0.65) +
+    # geom_point(size = 9, position = dodge, shape = 16) +  # Points for the mean with dodge
+    geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound, color = efficacy_type), 
+                  width = 0.0, size = 1.8, position = dodge) +  # Error bars with dodge
+    scale_fill_manual(values = efficacy_type_barcolors, name = "") + # Custom colors for bars
+    scale_color_manual(values = efficacy_type_errorbar_colors,  name = "") + # Custom colors for error bars 
+    scale_x_discrete(
+      breaks = c(1, 2, 3, 4, 5, 6, 7),   # Set the positions of the x-axis ticks
+      labels = c("6-16", "17-30", "31-40", "41-50", "51-60", "61-70", "71-80")  # Labels for age groups
+    ) +
+    # labs(x = "Age at vaccination", y = ylab, color = NULL) +  # Labels for x and y axes
+    scale_y_continuous(limits = c(NA,20), breaks = seq(0, 20, by = 5)) +  # Define y-axis tick points )+
+    theme_bw() +  # Clean theme
+    theme(
+      axis.ticks.length = unit(0.4, "cm"),        # Increase the length of the ticks
+      axis.ticks = element_line(size = 1.5),      # Increase the thickness of the ticks
+      panel.border = element_rect(color = "black", size = 2),  # Thicker border
+      plot.margin = margin(t=10, r=10, b=20, l=20),
+      axis.text.x = element_text(size = 35, color="black", angle= 0, margin = margin(t = 10, b = 20)),
+      axis.text.y = element_text(size = 35,color="black", margin = margin(r = 10, l = 10)),
+      # axis.title = element_text(size = 35, color = "black"),
+      axis.title = element_blank(),
+      legend.position = "top",
+      legend.direction = "horizontal",
+      legend.text = element_text(size = 40),
+      legend.key.size = unit(2, "cm"),  # Increase size of legend keys
+      legend.key.height = unit(1.5, "cm"),  # Increase height of legend keys
+      legend.key.width = unit(2.5, "cm"),  # Increase width of legend keys
+      legend.background = element_blank()
+    )
+  
+
+
+ }
+
+
+
+t_begin <- readRDS(here::here("model_output",  "pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds") )$v_year 
+
+t_end = t_begin +9
+
+
+
+# total
+
+nv_total <- extract_variable(rds_file = "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds" ,
+                            variable_name = "symp_sample_age") +
+           extract_variable(rds_file = "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+                            variable_name = "symp_sample_age_v")
+
+# new_vac_total <- extract_variable(rds_file = "detailed_a7_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+#                               variable_name = "new_vac_sample_age")
+
+# ## seronegative
+v_with_scrng <- extract_variable(rds_file = "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0_prescrng_1_sensiv_0.99.rds" ,
+                            variable_name = "symp_sample_age") +
+           extract_variable(rds_file = "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0_prescrng_1_sensiv_0.99.rds",
+                            variable_name = "symp_sample_age_v")
+
+v_without_scrng <- extract_variable(rds_file = "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                              variable_name = "symp_sample_age") +
+           extract_variable(rds_file = "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+                            variable_name = "symp_sample_age_v")
+
+averted_with_scrng <- get_averted_scrng(nv_output = nv_total,
+                               v_output = v_with_scrng,
+                               t_begin = t_begin,
+                               t_end = t_end)
+
+averted_without_scrng <- get_averted_scrng(nv_output = nv_total,
+                               v_output = v_without_scrng,
+                               t_begin = t_begin,
+                               t_end = t_end)
+
+
+df_averted_with_scrng <- as.data.frame(averted_with_scrng )
+
+df_averted_without_scrng <- as.data.frame(averted_without_scrng )
+
+
+averted_plot_scrng <- get_plot_averted_scrng(
+                                      df_with_scrng  = df_averted_with_scrng,
+                                      df_without_scrng = df_averted_without_scrng,
+                                      ylab = "Reported cases averted (%)" , 
+                                      figure_name = "avert_cases_scrng.jpg")
+averted_plot_scrng
+
+
+```
+
+
+
+### pre-screening test
+
+```{r}
+
+extract_variable <- function(rds_file, variable_name) {
+  
+result <- readRDS(here::here("model_output",  rds_file) )
+
+out_v <- as.data.frame(result$output, stringsAsFactors = FALSE)
+
+n_vac_age = result$n_vac_age
+n_sample = result$n_sample
+n_age = result$n_age
+n_year = result$n_year
+  
+  
+
+  x <- out_v[,colnames(out_v) == variable_name] 
+  
+  y <- array(NA, dim = c(n_vac_age,n_sample, n_age, n_year))
+  
+  for (i in 1:n_vac_age) {
+  
+  y[i,,,] <- x[[paste0("result.", i)]]
+  }
+  
+  return(y)
+}
+
+
+
+
+
+without_screening <- 1*extract_variable(rds_file = "try_pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0_prescrng_1_prescrenning_non_sero_1.rds", variable_name = "new_vac_sample_age") + 
+  0*extract_variable(rds_file = "try_pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0_prescrng_1_prescrenning_non_sero_1.rds", variable_name = "new_vac_sample_age_secondary")
+
+with_screening <- 1*extract_variable(rds_file = "try_pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0_prescrng_1_prescrenning_non_sero_0.rds", variable_name = "new_vac_sample_age") + 
+  0*extract_variable(rds_file = "try_pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0_prescrng_1_prescrenning_non_sero_0.rds", variable_name = "new_vac_sample_age_secondary")
+
+
+with_screening_vacc <- extract_variable(rds_file = "try_pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0_prescrng_1.rds", variable_name = "tot_pop_sample_age_v")
+
+
+with_screening_pop_age <- extract_variable(rds_file = "try_pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0_prescrng_1.rds", variable_name = "tot_pop_sample_age")
+# 
+# tot_vac_wo_screen <- extract_variable(rds_file = "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0_prescrng_1_prescrenning_non_sero_1.rds",
+#                               variable_name = "new_vac_sample_age_secondary")
+# 
+# 
+# 
+# tot_vac_w_screen <- extract_variable(rds_file = "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0_prescrng_1_prescrenning_non_sero_0.rds",
+#                               variable_name = "new_vac_sample_age_secondary")
+# 
+# 
+# tot_vac_wo_screen_t <- get_agg_over_age(tot_vac_wo_screen)
+# tot_vac_w_screen_t <- get_agg_over_age(tot_vac_w_screen)
+# 
+t_begin <- 10
+t_end <- 19
+
+get_agg_over_age <- function(arr) {
+  arr_agg_age <- apply(arr, c(1,2,4), sum)
+  return(arr_agg_age)
+}
+
+## cumulative number over year
+get_cumulative_over_time <- function(arr, t_begin, t_end) {
+  arr_cum_time <- apply(arr[, , t_begin:t_end], c(1, 2), sum)
+  return(arr_cum_time)
+}
+
+
+wo_screen <- get_agg_over_age(without_screening)
+w_screen <- get_agg_over_age(with_screening)
+# total_vac <- get_agg_over_age(total_vac)
+  
+wo_screen_t <- get_cumulative_over_time(wo_screen, t_begin = t_begin, t_end = t_end)
+w_screen_t <- get_cumulative_over_time(w_screen, t_begin = t_begin, t_end = t_end)
+# total_vac_cum_t <- get_cumulative_over_time(total_vac, t_begin = t_begin, t_end = t_end)
+
+ 
+  plot(wo_screen_t[,20], col="red", type="l") +
+   lines(w_screen_t[,20], col="green") 
+
+# plot(total_vac_cum_t[,1], col="red", ylim=c(0, 1300000)) + lines(vac_seron_cum_t[,1] + vac_serop_cum_t[,1], col="blue") + 
+#   lines(vac_seron_cum_t[,1], col="green") +
+#    lines(vac_serop_cum_t[,1], col="black") 
+```
+
+
+
+```{r}
+extract_variable_age <- function(rds_file, variable_name) {
+  
+result <- readRDS(here::here("model_output",  rds_file) )
+
+out_v <- as.data.frame(result$output, stringsAsFactors = FALSE)
+
+
+
+n_sample = result$n_sample
+n_sero = result$n_sero
+n_year = result$n_year
+n_vac_age = result$n_vac_age
+n_age  = result$n_age
+
+  x <- out_v[,colnames(out_v) == variable_name] 
+  
+  y <- array(NA, dim = c(n_vac_age,n_sample,n_age, n_year))
+  
+  for (i in 1:n_vac_age) {
+  
+  y[i,,,] <- x[[paste0("result.", i)]]
+  }
+  
+  return(y)
+}
+
+
+xx_vac <- extract_variable_age(rds_file = "pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds" ,
+                            variable_name = "new_vac_sample_age") 
+
+
+xx_seron <- extract_variable_age(rds_file = "pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds" ,
+                            variable_name = "new_vac_sample_age_primary") 
+
+xx_serop <- extract_variable_age(rds_file = "pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds" ,
+                            variable_name = "new_vac_sample_age_secondary") 
+
+
+xx_seron_total <-  apply(xx_seron, c(1,2,4), sum)
+
+xx_serop_total <-  apply(xx_serop, c(1,2,4), sum)
+
+xx_vac_total <-  apply(xx_vac, c(1,2,4), sum)
+
+plot(xx_serop_total[1,1,]/xx_vac_total[1,1,])
+
+```
+
+
+### Test for efficacy against infection
+
+```{r}
+
+get_agg_over_age <- function(arr) {
+  arr_agg_age <- apply(arr, c(1,2,4), sum)
+  return(arr_agg_age)
+}
+
+## cumulative number over year
+get_cumulative_over_time <- function(arr, t_begin, t_end) {
+  arr_cum_time <- apply(arr[, , t_begin:t_end], c(1, 2), sum)
+  return(arr_cum_time)
+}
+
+
+## extract variable from .rds file
+extract_variable <- function(rds_file, variable_name) {
+  
+  result <- readRDS(here::here("model_output",  rds_file) )
+  
+  out_v <- as.data.frame(result$output, stringsAsFactors = FALSE)
+  
+  n_vac_age = result$n_vac_age
+  n_sample = result$n_sample
+  n_age = result$n_age
+  n_year = result$n_year
+  
+  x <- out_v[,colnames(out_v) == variable_name] 
+  
+  y <- array(NA, dim = c(n_vac_age,n_sample, n_age, n_year))
+  
+  for (i in 1:n_vac_age) {
+    
+    y[i,,,] <- x[[paste0("result.", i)]]
+  }
+  
+  return(y)
+}
+
+
+rds_files <- c("effi_inf_pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
+    "pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+    "try_posi_effi_inf_pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds")
+
+
+# variable_name <- "inf_sample_age"
+
+
+
+without_effi_inf <- 1*extract_variable(rds_file = rds_files[1] , 
+                                 variable_name = "inf_sample_age_primary") + 
+      0*extract_variable(rds_file =  rds_files[1], 
+                       variable_name = "inf_sample_age_v_secondary")
+
+
+with_effi_inf <- 1*extract_variable(rds_file = rds_files[3] , 
+                                 variable_name = "inf_sample_age_primary") + 
+      0*extract_variable(rds_file =  rds_files[3], 
+                       variable_name = "inf_sample_age_v_secondary")
+
+
+total_over_time_with_effi_inf <- get_agg_over_age(with_effi_inf)
+total_over_time_without_effi_inf <- get_agg_over_age(without_effi_inf)
+
+ matplot(t(total_over_time_without_effi_inf[1,,]) - t(total_over_time_with_effi_inf[1,,]), type = "l", col = "red", lwd = 1,  ylim = c(0,10000)) 
+ 
+ #+ 
+#   lines(total_over_time_without_effi_inf[1,1,], type="l", lwd=1, col="blue")
+
+```
+## pre screening try
+
+
+```{r}
+get_agg_over_age <- function(arr) {
+  arr_agg_age <- apply(arr, c(1,2,4), sum)
+  return(arr_agg_age)
+}
+
+## cumulative number over year
+get_cumulative_over_time <- function(arr, t_begin, t_end) {
+  arr_cum_time <- apply(arr[, , t_begin:t_end], c(1, 2), sum)
+  return(arr_cum_time)
+}
+
+
+## extract variable from .rds file
+extract_variable <- function(rds_file, variable_name) {
+  
+  result <- readRDS(here::here("model_output",  rds_file) )
+  
+  out_v <- as.data.frame(result$output, stringsAsFactors = FALSE)
+  
+  n_vac_age = result$n_vac_age
+  n_sample = result$n_sample
+  n_age = result$n_age
+  n_year = result$n_year
+  
+  x <- out_v[,colnames(out_v) == variable_name] 
+  
+  y <- array(NA, dim = c(n_vac_age,n_sample, n_age, n_year))
+  
+  for (i in 1:n_vac_age) {
+    
+    y[i,,,] <- x[[paste0("result.", i)]]
+  }
+  
+  return(y)
+}
+
+
+get_agg <- function(out, t_begin, t_end){
+  
+  out_agg_age <- get_agg_over_age(out)
+  
+  out_cum_t <- get_cumulative_over_time( out_agg_age, t_begin = t_begin, t_end = t_end)
+  
+  out1 <- out_cum_t/10000
+  
+  
+  return(out1)
+  
+}
+
+
+
+get_plot_averted_serostatus <- function(df_total, df_seroneg, df_seropos, y_limits, y_breaks) {
+  
+  
+  # Add a column for age groups
+  df_total$age <- 1:nrow(df_total)
+  df_seroneg$age <- 1:nrow(df_seroneg)
+  df_seropos$age <- 1:nrow(df_seropos)
+  
+  # Reshape the dataframes to long format
+  df_total_long <- gather(df_total, key = "Realization", value = "Output", -age)
+  df_seroneg_long <- gather(df_seroneg, key = "Realization", value = "Output", -age)
+  df_seropos_long <- gather(df_seropos, key = "Realization", value = "Output", -age)
+  
+  # Add a column to indicate the vaccine coverage for each dataset
+  df_total_long$poptype <- "All"
+  df_seroneg_long$poptype <- "Seronegative"
+  df_seropos_long$poptype <- "Seropositive"
+  
+  # Combine all datasets into one long dataframe
+  df_long <- bind_rows(df_total_long, df_seroneg_long, df_seropos_long)
+  
+  # Calculate the mean and 95% confidence interval for each age group and vaccine coverage
+  summary_df <- df_long %>%
+    group_by(age, poptype) %>%
+    summarise(
+      mean_output = mean(Output),
+      lower_bound = quantile(Output, 0.025),
+      upper_bound = quantile(Output, 0.975)
+    ) %>%
+    ungroup()
+  
+  
+  
+  # Define colors for different vaccine coverages
+  poptype_barcolors <- c("All" = "#8dd3c7", "Seronegative" = "#fdb462", "Seropositive" = "#b3de69")
+  
+  poptype_errorbar_colors <- c("All" = "#55a39b", "Seronegative" = "#e08d3e", "Seropositive" = "#85a84e")
+  
+  # Define the dodge position for side-by-side plotting
+  dodge <- position_dodge(width = 0.3)
+  
+  # Plot using ggplot2
+  p <- ggplot(summary_df, aes(x = factor(age), y = mean_output, fill = poptype)) +
+    # geom_point(size = 9, position = dodge, shape = 16) +  # Points for the mean with dodge
+    geom_bar(stat = "identity", position = position_dodge(width = 0.75), width = 0.65) +
+    
+    geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound, color = poptype), 
+                  width = 0.0, size = 1.8, position = position_dodge(width = 0.75)) +
+    # geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound), 
+    #               width = 0.0, size = 1.8, position = dodge) +  # Error bars with dodge
+    scale_fill_manual(values = poptype_barcolors, name = "") + # Custom colors for bars
+    scale_color_manual(values = poptype_errorbar_colors,  name = "") + # Custom colors for error bars
+    # scale_color_manual(values = poptype_colors, name = "") + 
+    scale_x_discrete(
+      breaks = c(1, 2, 3, 4, 5, 6, 7),   # Set the positions of the x-axis ticks
+      labels = c("6-16", "17-30", "31-40", "41-50", "51-60", "61-70", "71-80")  # Labels for age groups
+    ) +
+    # labs(x = "Age at vaccination", y = ylab, color = NULL) +  # Labels for x and y axes
+    scale_y_continuous(limits = y_limits, breaks = y_breaks) +  # Define y-axis tick points )+
+    theme_bw() +  # Clean theme
+    theme(
+      axis.ticks.length = unit(0.4, "cm"),        # Increase the length of the ticks
+      axis.ticks = element_line(size = 1.5),      # Increase the thickness of the ticks
+      panel.border = element_rect(color = "black", size = 2),  # Thicker border
+      plot.margin = margin(t=10, r=10, b=20, l=25),
+      axis.text.x = element_text(size = 35, color="black", angle= 30, margin = margin(t = 10, b = 20)),
+      axis.text.y = element_text(size = 35,color="black", margin = margin(r = 10, l = 30)),
+      # axis.title = element_text(size = 35, color = "black"),
+      axis.title = element_blank(),
+      legend.position = "top",
+      legend.direction = "horizontal",
+      legend.text = element_text(size = 40),
+      legend.key.size = unit(2, "cm"),  # Increase size of legend keys
+      legend.key.height = unit(1.5, "cm"),  # Increase height of legend keys
+      legend.key.width = unit(2.5, "cm"),  # Increase width of legend keys
+      legend.background = element_blank()
+    )
+  
+   return(list(plot = p, summary = summary_df))
+  
+}
+
+
+get_arranged_plot_averted_serostatus <- function(set_of_rds_files, y_lab, t_begin, t_end) {
+  
+  plot_list <- list()
+  summary_list <- list()
+  
+  for (i in seq_along(set_of_rds_files)) {
+    
+    rds_files <- set_of_rds_files[[i]]
+
+    
+    ## seronegative
+    v_seroneg <- extract_variable(rds_file = rds_files[1] , 
+                                 variable_name = "inf_sample_age_v_primary") 
+    
+    v_seropos <- extract_variable(rds_file = rds_files[1] , 
+                                 variable_name = "inf_sample_age_v_secondary") 
+    
+    
+    v_total <- extract_variable(rds_file = rds_files[1] , 
+                                variable_name =  "inf_sample_age_v") 
+    
+
+    agg_v_seroneg <- get_agg(out = v_seroneg,   
+                             t_begin = t_begin,
+                             t_end = t_end)
+    
+    agg_v_seropos <- get_agg(out = v_seropos,
+                             t_begin = t_begin,
+                             t_end = t_end)
+    
+    agg_v_total <- get_agg(out = v_total,
+                             t_begin = t_begin,
+                             t_end = t_end)
+    
+    df_agg_v_seroneg <- as.data.frame(agg_v_seroneg)
+    df_agg_v_seropos <- as.data.frame(agg_v_seropos)
+    df_agg_v_total <- as.data.frame(agg_v_total)
+    
+
+    # Determine y-axis settings for this figure
+    if (i == 1 ) {  # Example: The second figure requires different limits
+      y_limits <- custom_y_limits1
+      y_breaks <- custom_y_breaks1
+      
+    } else if (i == 2) {
+      y_limits <- custom_y_limits2
+      y_breaks <- custom_y_breaks2
+      
+    } else if (i == 3) {
+      y_limits <- custom_y_limits3
+      y_breaks <- custom_y_breaks3
+      
+    }  else if (i == 4) {
+      y_limits <- custom_y_limits4
+      y_breaks <- custom_y_breaks4
+    }
+    
+    
+  
+    result <- get_plot_averted_serostatus(
+      df_total = df_agg_v_total,
+      df_seroneg = df_agg_v_seroneg,
+      df_seropos = df_agg_v_seropos,
+      y_limits = y_limits,
+      y_breaks = y_breaks)
+   
+    averted_plot_serostatus <- result$plot
+    
+    plot_list[[i]] <-  averted_plot_serostatus
+    summary_list[[i]] <- result$summary
+    
+  }
+  
+  
+    ## store the estimates in a file for future reference
+  names(summary_list) <- c("DENV1", "DENV2", "DENV3", "DENV4")
+  combined_summary <- dplyr::bind_rows(summary_list, .id = "Sero")
+  ## saving upto 3 decimal place
+  combined_summary <- combined_summary %>%
+  dplyr::mutate(
+    mean_output = round(mean_output, 3),
+    lower_bound = round(lower_bound, 3),
+    upper_bound = round(upper_bound, 3)
+  )
+  write.table(combined_summary,
+            file = here::here("output_estimate_figure", "symp_serop_seron_perc_xxxx.txt"),
+            sep = "\t",
+            row.names = FALSE,
+            quote = FALSE)
+  
+  
+  
+  ## remove legend in each of the figure
+  plot_list_wo_legend <- list()
+  
+  for (i in seq_along(plot_list)) {
+    plot_list_wo_legend[[i]] <- plot_list[[i]] + theme(legend.position = "none")
+  }  
+  
+  ## extrct the legend  
+  legend_plot <- get_legend(averted_plot_serostatus)  
+  
+  # Create the grid of plots without individual x and y labels
+  plot_wo_labels <- plot_grid(
+    plotlist = plot_list_wo_legend,
+    nrow = 2,
+    ncol = 2,
+    align = "hv",
+    axis = "tblr",
+    labels = c("(a)", "(b)", "(c)", "(d)"),  # Add subfigure labels
+    label_size = 40,                        # Adjust label size
+    label_x = 0.03,                         # Adjust horizontal position of labels
+    label_y = 1.08                          # Adjust vertical position of labels
+  )
+  
+  plot_with_labels <- ggdraw() +
+    draw_plot(plot_wo_labels, x = 0, y = 0, width = 1, height = 1) +   
+    draw_label(y_lab, x = 0.01, y = 0.55, angle = 90, size = 45, fontface = "bold") +  # Y-axis label
+    draw_label("Age at vaccination (year)", x = 0.5, y = 0.025, angle = 0, size = 45, fontface = "bold")           # X-axis label
+  
+  # make grid of plots  
+  final_plot_with_legend <- plot_grid(
+    legend_plot,
+    plot_with_labels,
+    nrow = 2, 
+    rel_heights = c(0.1,1)  
+  )
+  
+  return(final_plot_with_legend)
+  
+}  
+
+
+
+### Inputs
+
+
+## List all the datasets that we want to plot together
+set_of_rds_files <- list(
+  c(
+    "pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0_prescrng_1.rds"),  # Set 1
+
+  c(
+    "pri_sec_neq_detailed_a7_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0_prescrng_1.rds"),  # Set 2
+
+  c(
+    "pri_sec_neq_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_no_nsamp_100_waning_0_prescrng_1.rds"),  # Set 3
+
+  c(
+    "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0_prescrng_1.rds")    # Set 4
+)
+
+
+## grab the start of vaccination year from one of the dataset
+t_begin = readRDS(here::here("model_output",set_of_rds_files[[1]][1]) )$v_year 
+
+custom_y_limits1 <- c(0, 20)
+custom_y_breaks1 <- seq(0, 20, by = 5)
+
+
+custom_y_limits2 <- c(0,20)
+custom_y_breaks2 <- seq(0, 20, by = 5)
+
+# Custom y-axis settings for a specific figure (for negative impact)(change it accordingly)
+custom_y_limits3 <- c(0, 50)
+custom_y_breaks3 <- seq(0, 50, by = 10)
+
+custom_y_limits4 <- c(0, 50)
+custom_y_breaks4 <- seq(0, 50, by = 10)
+
+## Generate figure now
+plot_impact <- get_arranged_plot_averted_serostatus(set_of_rds_files = set_of_rds_files,
+                                                                    
+                                                                    y_lab = " Vaccinated infection",
+                                                                    t_begin = t_begin,
+                                                                    t_end = t_begin + 9)
+
+figure_name <- "inf_seropos_seron_with_screening.jpg"
+
+## save
+ggsave(
+  filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
+  plot = plot_impact,                                            # The plot object to save
+  width = 29*2,                                           # Width in inches
+  height = 40,                                          # Height in inches
+  dpi = 300,
+  units = "cm")                                  # DPI (resolution)
+
+
+```
+
+
 

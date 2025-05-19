@@ -1,0 +1,1428 @@
+---
+title: "Transmission_model"
+author: "Abhishek Senapati"
+date: "`r Sys.Date()`"
+output: 
+  html_document: 
+    highlight: monochrome
+    theme: journal
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+rm(list = ls(all = TRUE)) ### will remove everything from workspace
+gc(reset = TRUE)        ### collects garbage memory
+
+source("~/codes/dengue_main/test/utils.R")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+### call all the libraries
+
+library(dust)
+library(mcstate)
+library(odin.dust)
+library(readxl)
+library(ggplot2)
+# library(ggpubr)
+library(dplyr)
+library(imputeTS)
+```
+
+
+
+### Demographic Information
+
+
+#### Population in each age group
+
+```{r }
+## Total number of population in each age-group (Only Singapore Residents (Citizen+PR))
+
+### use library "here" to locate the data (will be useful when running the code on HPC)
+pop_data = read_xlsx("~/codes/dengue_main/data/singapore_population_data.xlsx", sheet = "T3")
+
+## Specify the beginning and and end year for demographic information from the data (singstat.gov.sg)
+begin_year = "2013"
+end_year = "2021"
+
+n_year <- (as.numeric(end_year) - as.numeric(begin_year)) + 1
+
+## number of extra year for which the model will be simulated
+extra_year <- 100
+
+sim_year <- n_year + extra_year
+
+## create array of time in day (required for solving ode)
+t <- seq(1,(sim_year*365), by = 1)
+
+### for fitting 
+data_reported_yearly = read_xlsx("~/codes/dengue_main/data/serotype_share_age_cases.xlsx",
+                         sheet = "yearly_reported_cases")
+
+reported_cases_data <- data_reported_yearly[data_reported_yearly$year %in% 2013:2021,]
+
+# reported_cases=reported_cases_data %>%
+#     select(year, cases_p_100k) %>%
+#     mutate(
+#       day=c(0,365*(1:(length(reported_cases_data$year)-1)))
+#     ) 
+##########
+### for fitting
+
+ # t <- 0:((length(reported_cases_data$year)-1)*365)
+
+## get the population data for n_year
+pop_data_final <- get_processed_population_data(pop_data = pop_data,
+                                                begin_year = begin_year,
+                                                end_year = end_year)
+
+## Initial population in each age group
+pop_each_age_group <- as.numeric(unlist(pop_data_final[-1,
+                       which(names(pop_data_final) %in% c(begin_year))]))
+
+## Number of age group
+n_age <- length(pop_each_age_group) 
+
+## Number of serotype
+n_sero <- 4
+```
+
+#### Crude birth rate over time
+
+```{r}
+## Read birth rate data from sgstat.gov.sg
+birth_rate_data = read_xlsx("~/codes/dengue_main/data/singapore_population_data.xlsx",
+                           sheet = "birth_rate_per_1k")
+
+## historical birth death data from WPP
+birth_rate_WPP = read_xlsx("~/codes/dengue_main/data/singapore_population_data.xlsx",
+                           sheet = "birth_death_WPP")
+
+## projection of birth rate data from (World population prospects) WPP
+## Link: https://population.un.org/wpp/Graphs/DemographicProfiles/Line/702
+
+birth_rate_projection = read_xlsx("~/codes/dengue_main/data/singapore_population_data.xlsx",
+                           sheet = "birth_death_projection_medium")
+
+
+## 1.Without any data and projection from WPP
+
+# lambda_hum1 <- birth_rate_data[(birth_rate_data$Data_Series %in%
+#                                        "Crude Birth Rate (Per Thousand Residents)"),
+#                               which(names(birth_rate_data) %in% begin_year:end_year)]
+# 
+# lambda_hum <- c(as.numeric(unlist(rev(lambda_hum1))))
+# 
+# ## make it per day per 1k (time dependent)
+# lambda_hum_tt <- (1/(365*1000))*rep(lambda_hum, each=365)
+
+
+
+## 2. With WPP Only
+# lambda_hum1 <- birth_rate_WPP[(which(birth_rate_WPP$Year==begin_year)):(which(birth_rate_WPP$Year=="2021")),which(names(birth_rate_WPP) == "Crude Birth Rate (births per 1,000 population)" )]
+# 
+# lambda_hum_proj1 <- birth_rate_projection[,which(names(birth_rate_projection) == "Crude Birth Rate (births per 1,000 population)" )]
+# 
+# 
+# lambda_hum <- c(as.numeric(unlist(lambda_hum1)), as.numeric(unlist(lambda_hum_proj1)) )
+# 
+# ## make it per day per 1k (time dependent)
+# lambda_hum_tt <- (1/(365*1000))*rep(lambda_hum, each=365)
+
+
+
+### 3. beginning with sgstat.gov.sg and the then projection from WPP
+
+lambda_hum_proj1 <- birth_rate_projection[,which(names(birth_rate_projection) == "Crude Birth Rate (births per 1,000 population)" )]
+
+lambda_hum1 <- birth_rate_data[(birth_rate_data$Data_Series %in%
+                                       "Crude Birth Rate (Per Thousand Residents)"),
+                              which(names(birth_rate_data) %in% begin_year:end_year)]
+
+lambda_hum <- c(as.numeric(unlist(rev(lambda_hum1))), as.numeric(unlist(lambda_hum_proj1))[2:length(as.numeric(unlist(lambda_hum_proj1)))] )
+
+## make it per day per 1k (time dependent)
+# lambda_hum_tt <- (1/(365*1000))*rep(lambda_hum[1:(min(length(lambda_hum),sim_year))], each=365)
+
+
+###
+lambda_hum_tt <- (1/(365*1000))*(c(lambda_hum[1],rep(lambda_hum[2:(min(length(lambda_hum),sim_year))], each = 365)))
+
+  
+## for extra year for which the data is not available from WPP
+## we take the last value from the data and simulate forward
+# ##  Birth rate
+ 
+if (length(lambda_hum_tt) < length(t)) {
+  lambda_hum_tt = c(lambda_hum_tt,
+                    rep(lambda_hum_tt[length(lambda_hum_tt)],
+                        (length(t) - length(lambda_hum_tt)))
+  )
+}
+```
+
+#### Age-specific mortality data over time
+
+```{r}
+age_mort_data = read_xlsx("~/codes/dengue_main/data/singapore_population_data.xlsx",
+                         sheet = "age_specific_death_rate_per_1k")
+
+## historical birth death data from WPP
+death_rate_WPP = read_xlsx("~/codes/dengue_main/data/singapore_population_data.xlsx",
+                           sheet = "birth_death_WPP")
+
+## Projection from WPP
+death_rate_projection = read_xlsx("~/codes/dengue_main/data/singapore_population_data.xlsx",
+                           sheet = "birth_death_projection_medium")
+
+
+## 1. without any data and projection from WPP
+# total_death_rate <- age_mort_data[age_mort_data$Data_Series==
+#                   "Total Age Specific Death Rate",
+#                   -which(names(age_mort_data) %in% c("Data_Series"))]
+# 
+# death_hum1 <- as.numeric(select(total_death_rate,  begin_year:end_year))
+# 
+# death_hum <- c(death_hum1)
+# death_hum_age <- array(rep(death_hum,each= n_age), dim = c(n_age,n_year) )
+# 
+# ## make it daily
+# death_hum_tt <- (1/(365*1000))*(apply(death_hum_age, 1,
+#                                               function(x) rep(x,each=365)))
+
+
+## 2. With WPP Only
+# death_hum_proj1 <- death_rate_projection[,which(names(death_rate_projection) == "Crude Death Rate (deaths per 1,000 population)" )]
+# 
+# 
+# death_hum1 <- death_rate_WPP[(which(birth_rate_WPP$Year==begin_year)):(which(birth_rate_WPP$Year=="2021")),which(names(death_rate_WPP) == "Crude Death Rate (deaths per 1,000 population)" )]
+# 
+# death_hum <- c(as.numeric(unlist(death_hum1)), as.numeric(unlist(death_hum_proj1)) )
+# 
+# death_hum_age <- array(rep(death_hum,each= n_age), dim = c(n_age,length(death_hum)) )
+# 
+# ## make it daily
+# death_hum_tt <- (1/(365*1000))*(apply(death_hum_age, 1,
+#                                               function(x) rep(x,each=365)))
+
+
+### 3. Beginning with sgstat.gov.sg and the then projection from WPP
+
+total_death_rate <- age_mort_data[age_mort_data$Data_Series ==
+                  "Total Age Specific Death Rate",
+                  -which(names(age_mort_data) %in% c("Data_Series"))]
+
+death_hum1 <- select(total_death_rate,  begin_year:end_year)
+
+death_hum_proj1 <- death_rate_projection[,which(names(death_rate_projection) == "Crude Death Rate (deaths per 1,000 population)" )]
+
+
+death_hum <- c(as.numeric(unlist(death_hum1)), as.numeric(unlist(death_hum_proj1))[2:length(as.numeric(unlist(death_hum_proj1)))] )
+
+death_hum_age <- array(rep(death_hum,each = n_age), dim = c(n_age,length(death_hum)) )
+
+#  ## make it daily
+# death_hum_tt <- (1/(365*1000))*(apply(death_hum_age[,1:(min(length(lambda_hum),sim_year))], 1,
+#                                               function(x) rep(x,each=365)))
+
+
+
+
+death_hum_tt <- (1/(365*1000))*(rbind(death_hum_age[,1] ,apply(death_hum_age[,2:(min(length(death_hum),sim_year))], 1,
+                                              function(x) rep(x,each = 365))))
+
+## for constant population take birth and death same
+# 
+# 
+# death_hum <- unlist(lambda_hum)
+# 
+# death_hum_age <- array(rep(death_hum,each= n_age), dim = c(n_age,n_year) )
+# 
+# death_hum_tt <- (1/(365*1000))*(apply((death_hum_age), 1,
+#                                               function(x) rep(x,each=365)))
+
+# ##########################
+
+# for age specific mortality rate 
+# TODO:
+# 
+# death_hum <- get_age_specific_mortality(age_mort_data = age_mort_data,
+#                                         pop_data_final=pop_data_final,
+#                                         begin_year = begin_year,
+#                                         end_year = end_year)
+# 
+#  ## make it per day per 1k (time dependent)
+#     death_hum_tt <- (1/(365*1000))*(apply((death_hum), 1,
+#                                               function(x) rep(x,each=365)))
+
+
+##################################################################################
+
+
+######### for missing info of death rate takes the last data point and continue #############
+    ## death rate
+    if (dim(death_hum_tt)[1] < length(t)){
+              death_hum_tt = rbind(death_hum_tt, 
+                               matrix( rep(death_hum_tt[dim(death_hum_tt)[1],],
+                                (length(t)- dim(death_hum_tt)[1])), ncol=n_age)
+                                )
+                                }
+```
+
+#### Sero-prevalence data (Reconstruction of sero-prevalence using catalytic model)
+
+```{r}
+# Read the data
+data_sero <- read_xlsx("~/codes/dengue_main/data/dengue_sero_prevalence_singapore.xlsx", sheet = "dengue_sero_p_2013_17")
+
+## select the sero_prevalence data
+sero_year = 2013
+
+#### age that we are modelling i.e 0-89y and 90+y
+age = 0:90
+
+seroprevalence <- get_seroprevalence(data_sero = data_sero, sero_year = sero_year, age = age)
+
+sero_p <- seroprevalence[1,]
+sero_n <- seroprevalence[2,]
+primary <- seroprevalence[3,]
+secondary <- seroprevalence[4,]
+
+```
+
+##### Demographic
+
+```{r}
+
+  age_width <- 1 ## 
+  age_rate <- c(rep(1/(365*age_width), (n_age - 1)),0)## Transition rate between age groups
+
+  #### Mosquito
+  ## mosquito dearth rate
+  death_mos = 1/10
+
+  ## Adult mosquito recruitment rate
+  lambda_mos = death_mos 
+```
+
+###### Initial conditions
+
+```{r eval=TRUE}
+#### Unvaccinated
+## Symptomatic (Primary)
+I0 = matrix(0, nrow = n_age, ncol = n_sero, byrow = TRUE)
+# I0[10,]=c(5,2,.001,1)
+# I0[40,] = c(1800,5,.0025,1) #c(5000,100,1,1)
+# I0 = array(init[index_I], dim=c(n_age, n_sero))
+## Asymptomatic (Primary)
+A0 = matrix(0, nrow = n_age, ncol = n_sero, byrow = TRUE)
+# A0 = array(init[index_A], dim=c(n_age, n_sero))
+
+## Susceptible secondary infection
+frac_serotype <-  c(.352860, .490160, .111505,  .045475) #c(0.39, 0.58, 0.02, 0.01)  
+### TODO: get the correct fraction from the sero-share data?
+## From 1994 - 2022:  c(.3119,.4648,.1735,.0498)
+## From 1994 - 2013: c(.352860, .490160, .111505,  .045475)
+
+## Cross-immune
+C0 = 0.0*t(frac_serotype*t(array(rep(primary*pop_each_age_group,n_sero), dim = c(n_age,n_sero))))
+
+S0 = 1*t(frac_serotype*t(array(rep(primary*pop_each_age_group,n_sero), dim = c(n_age,n_sero))))
+
+
+## Symptomatic (Secondary infection)
+I_ij0 = array(0,dim=c(n_age, n_sero))
+## Asymptomatic (Secondary Infection)
+A_ij0 = array(0,dim=c(n_age, n_sero))
+
+H0 = rep(0, n_age)
+## Recovered from Secondary infection
+R0 =  sero_p*pop_each_age_group - rowSums(S0) - rowSums(C0) # secondary*pop_each_age_group 
+
+## Susceptible population
+S0_all =  pop_each_age_group - rowSums(I0+A0+C0+S0) -rowSums(I_ij0+A_ij0) - (H0+R0)
+
+total_pop_age0 <- pop_each_age_group  
+
+factor <- .01
+total_human <- sum(pop_each_age_group)
+## Susceptible mosquito
+S_m0 = factor*total_human
+# ## Exposed Mosquito
+E_m0 = c(0,0,0,0) #c(150,.001,.001,1) #c(4,0.007,0.00005,1) #c(400,.002,.0005,1) # E_m0 = c(100,.01,.001,1) den-2 is in oscillation
+# ## infected mosquito
+I_m0 = c(2e-2,5e-3,1e-2,1e-6) # c(270,.007,0.1,1) #c(.01,.1,.01,0)
+
+N_mos <- S_m0 + sum(E_m0) + sum(I_m0)
+
+### Vaccinated population
+S0_v_all = rep(0,n_age)
+I_v0 = matrix(0, nrow=n_age, ncol=n_sero, byrow=TRUE)
+A_v0 = matrix(0, nrow=n_age, ncol=n_sero, byrow=TRUE)
+C_v0 = matrix(0, nrow=n_age, ncol=n_sero, byrow=TRUE)
+S_v0 = matrix(0, nrow=n_age, ncol=n_sero, byrow=TRUE)
+I_v_ij0 = array(0,dim=c(n_age, n_sero))
+A_v_ij0 = array(0,dim=c(n_age, n_sero))
+H_v0 = rep(0, n_age)
+R_v0 = rep(0, n_age)
+```
+
+
+###### Transmission related parameters
+
+```{r}
+tt <- t
+## biting rate per mosquito
+b = 15
+
+delta0 = 0.0
+b_tt = b*(1 + delta0*sin(2*pi*tt/365))
+# Transmission rate from infected human to mosquito
+beta_h = c(0.20,0.20,0.20,0.20)   
+
+# Transmission rate from mosquitoes infected 
+# with different serotypes to human
+# beta_m1 = 0.175 #0.164    #0.20   # 0.195   #0.195 (better) ## 0.175 (C0_factor=1)
+# beta_m2 = 0.188 #0.184  #0.208  #0.215   #0.208(better)  ## 0.188 (C0_factor =1)
+# beta_m3 = 0.162 #0.160  # 0.08  #0.157
+# beta_m4 = 0.150  #0.05
+
+
+beta_m1 = 0.166 #0.164    #0.20   # 0.195   #0.195 (better) ## 0.175 (C0_factor=1)
+beta_m2 = 0.176 #0.184  #0.208  #0.215   #0.208(better)  ## 0.188 (C0_factor =1)
+beta_m3 = 0.152 #0.160  # 0.08  #0.157
+beta_m4 = 0.144  #0.05
+
+
+beta_m = c(beta_m1, beta_m2, beta_m3, beta_m4)
+ 
+
+# fraction of total primary infection becomes symptomatic
+rho_2 = rep(0.0, n_age)
+
+rho_2_a1 = 8.136e-02
+rho_2_a2 = 2.744e-01
+rho_2_a3 = 4.639e-01
+rho_2_a4 = 4.371e-01
+rho_2_a5 = 4.301e-01
+rho_2_a6 = 4.583e-01
+rho_2_a7 = 4.839e-01
+rho_2_a8 = 6.653e-01
+
+
+
+
+
+# 
+rho_2[1:5] <- rho_2_a1
+rho_2[6:15] <- rho_2_a2
+rho_2[16:25] <- rho_2_a3
+rho_2[26:35] <- rho_2_a4
+rho_2[36:45] <- rho_2_a5
+rho_2[46:55] <- rho_2_a6
+rho_2[56:65] <- rho_2_a7
+rho_2[66:91] <- rho_2_a8
+
+# fraction of symptomatic for secondary infection
+rho_1 =  0.5*rho_2 #0.30
+# Infectious period primary infection
+gamma_1 = 1/4
+# Infectious period secondary infection
+gamma_2 = 1/4
+# infectiousness of asymptomatic relative to symptomatic
+kai = 1
+#
+alpha = 1/(1*365)
+# rate of hospitalization for primary infection
+xi_1 = 0*0.30/4
+# rate of hospitalization for secondary infection
+xi_2 = 0*0.30
+
+
+# fraction of total seronegative vaccinated infection becomes symptomatic
+rho_v_1 = 0.1
+# fraction of total sero-positive vaccinated infections
+rho_v_2 = 0.3
+# Infectious period for seronegative vaccinated  infection
+gamma_v_1 = gamma_1
+# Infectious period for seropositive vaccinated infection
+gamma_v_2 = gamma_2
+# infectiousness of vaccinated asymptomatic relative to vaccinated symptomatic
+kai_v = kai
+#  duration of heterologous protection for vaccinated
+alpha_v = alpha
+# rate of hospitalization for seronegative vaccinated infection
+xi_v_1 = xi_1
+# rate of hospitalization for seropositive vaccinated infection
+xi_v_2 = xi_2
+
+# extrinsic incubation period
+sigma_m = 1/10
+
+# ## importation of infection
+# imported_yearly = read_xlsx("~/codes/dengue_main/data/serotype_share_age_cases.xlsx",
+#                          sheet = "imported_cases")
+# 
+# imported_cases_data <- imported_yearly[imported_yearly$year %in% 2013:2020,]
+# 
+# ratio_inf_cases <- 1
+# # imported_infection <- ratio_inf_cases*as.numeric(unlist(imported_cases_data$n_import))
+# 
+# imported_infection <- 0*rep(300, sim_year)
+# 
+# frac_import <- 1
+# import_tt <- array(0,dim=c(length(t),n_age, n_sero))
+# # import_begin <-  c(1,365*(1:(length(imported_cases_data$year)-1)))
+# import_begin <-  (365*7):2560 #c(1,365*(1:(sim_year-1)))
+# 
+# # import_end <- import_begin +10
+# time_import <- import_begin
+# age_import <- 30
+# sero_import <- c(0.05,0.9,0.05,0.0)
+# for (i in 1:length(time_import)){
+#   for (j in age_import){
+#     for (k in 1:n_sero){
+#       import_tt[time_import[i],j,k] = sero_import[k]*imported_infection[i] 
+#     }
+#   }
+# }
+# 
+# import_tt_pri <- 0*frac_import*import_tt
+# import_tt_sec <- (1-frac_import)*import_tt
+
+
+import_tt <- array(0,dim = c(length(t), n_sero))
+# import_tt <- array(0,dim = c(20, n_sero))
+
+import_begin <- (365*(1:(sim_year-1)))
+
+# time_import <- import_begin
+
+sero_import <- c(0,0,0,0)
+
+for (i in import_begin) {
+  import_tt[i, ] <- sero_import
+}
+# import_tt[360,] <- sero_import #c(10,0,0,0)
+
+# import_tt[720,] <-  c(0,0,1,0)
+
+
+
+```
+
+## Vaccine related paramter
+
+```{r}
+tt <- t
+vac_rate0 <- 0.0
+vac_rate_tt <- rep(0,length(tt))
+vac_rate_tt[(11*365):(31*365)] <- vac_rate0
+
+## target age group
+vac_switch <- rep(0,n_age)
+vac_switch[1:91] <- 1
+
+# define VE from trial data for Qdenga (4.5 years after second dose)
+# source: Lancet et al. (2024) Lancet Global health
+# https://www.thelancet.com/journals/langlo/article/PIIS2214-109X(23)00522-3/fulltext
+
+effi_inf_sero_n_trial = rep(0.0,n_age)  
+effi_inf_sero_p_trial =  rep(0.0,n_age) 
+effi_symp_sero_n_trial = matrix(0.535, nrow = n_age, ncol = n_sero, byrow = TRUE)
+effi_symp_sero_p_trial = matrix(0.642, nrow = n_age, ncol = n_sero, byrow = TRUE)
+effi_hos_sero_n_trial = matrix(0.793, nrow = n_age, ncol = n_sero, byrow = TRUE)
+effi_hos_sero_p_trial = matrix(0.859, nrow = n_age, ncol = n_sero, byrow = TRUE)
+
+## conditional VE
+effi_inf_sero_n = effi_inf_sero_n_trial
+effi_inf_sero_p = effi_inf_sero_p_trial
+effi_symp_sero_n = 1 - ((1 - effi_symp_sero_n_trial)/(1 - effi_inf_sero_n_trial))
+effi_symp_sero_p = 1 - ((1 - effi_symp_sero_p_trial)/(1 - effi_inf_sero_p_trial))
+effi_hos_sero_n = 1 - ((1 - effi_hos_sero_n_trial)/(1 - effi_symp_sero_n_trial))
+effi_hos_sero_p = 1 - ((1 - effi_hos_sero_p_trial)/(1 - effi_symp_sero_p_trial))
+```
+
+```{r eval=FALSE}
+# basic_symp = rho_1*(b^2)*beta_m*beta_h*sigma_m*lambda_mos*mean(death_hum_tt[1,])/((death_mos^2)*(sigma_m+death_mos)*(total_human*lambda_hum_tt[1])*(gamma_1+mean(death_hum_tt[1,])+xi_1))
+# 
+# basic_asymp = (1-rho_1)*kai*(b^2)*beta_m*beta_h*sigma_m*lambda_mos*mean(death_hum_tt[1,])/((death_mos^2)*(sigma_m+death_mos)*(total_human*lambda_hum_tt[1])*(gamma_1+mean(death_hum_tt[1,])+xi_1))
+
+basic_symp=rho_1*(b^2)*beta_m*beta_h*sigma_m*lambda_mos*N_mos*mean(death_hum_tt[1,])/((death_mos^2)*(sigma_m+death_mos)*(total_human*lambda_hum_tt[1])*(gamma_1+mean(death_hum_tt[1,])+xi_1))
+
+basic_asymp=(1-rho_1)*kai*(b^2)*beta_m*beta_h*sigma_m*lambda_mos*N_mos*mean(death_hum_tt[1,])/((death_mos^2)*(sigma_m+death_mos)*(total_human*lambda_hum_tt[1])*(gamma_1+mean(death_hum_tt[1,])+xi_1))
+
+basic_repro_sero_specific = sqrt(basic_symp + basic_asymp)
+
+basic_repro_sero_specific
+```
+
+# compile the model
+
+```{r}
+vaccine_incidence_model <- odin.dust::odin_dust("~/codes/dengue_main/test/model.R")
+```
+
+```{r, eval=TRUE}
+par <- list(
+  tt = tt,
+  n_age = n_age,
+  n_sero = n_sero,
+  beta_h = beta_h,
+  beta_m1 = beta_m1,
+  beta_m2 = beta_m2,
+  beta_m3 = beta_m3,
+  beta_m4 = beta_m4,
+  # b = b,
+  b_tt = b_tt,
+  vac_rate_tt = vac_rate_tt,
+  vac_switch = vac_switch,
+  kai = kai,                     
+  kai_v = kai_v,                   
+  rho_1 = rho_1,               
+  rho_2 = rho_2,                
+  rho_v_1 = rho_v_1,              
+  rho_v_2 = rho_v_2,               
+  sigma_m = sigma_m,              
+  alpha = alpha,                
+  alpha_v = alpha_v,             
+  gamma_1 = gamma_1,              
+  gamma_2 = gamma_2,              
+  gamma_v_1 = gamma_v_1,             
+  gamma_v_2 = gamma_v_2,             
+  xi_1 = xi_1,         
+  xi_2 = xi_2,              
+  xi_v_1 = xi_v_1,            
+  xi_v_2 = xi_v_2,      
+  
+  lambda_hum_tt = lambda_hum_tt, 
+  death_hum_tt = death_hum_tt,  
+  # import_tt_pri = import_tt_pri,
+  # import_tt_sec = import_tt_sec,
+  import_tt = import_tt,
+  
+  lambda_mos = lambda_mos,          
+  death_mos = death_mos,            
+  
+  age_rate = age_rate,
+   
+  I0 = I0,
+  A0 = A0,
+  C0 = C0,
+  S0 = S0,
+  I_ij0 = I_ij0,
+  A_ij0 = A_ij0,
+  H0 = H0,
+  R0 = R0,
+  S0_all = S0_all,
+  S_m0 = S_m0,
+  E_m0 = E_m0,
+  I_m0 = I_m0,
+  total_pop_age0 = total_pop_age0,
+  
+  S0_v_all = S0_v_all,
+  I_v0 = I_v0,
+  A_v0 = A_v0,
+  C_v0 = C_v0,
+  S_v0 = S_v0,
+  I_v_ij0 =  I_v_ij0,
+  A_v_ij0 = A_v_ij0,
+  H_v0 = H_v0,
+  R_v0 = R_v0,
+  
+  effi_inf_sero_n = effi_inf_sero_n,
+  effi_inf_sero_p = effi_inf_sero_p,
+  effi_symp_sero_n = effi_symp_sero_n,
+  effi_symp_sero_p = effi_symp_sero_p,
+  effi_hos_sero_n = effi_hos_sero_n,
+  effi_hos_sero_p = effi_hos_sero_p
+)
+```
+
+#### instance of the model
+
+```{r, eval=TRUE}
+model <- vaccine_incidence_model$new(par, time = 1, n_particles = 1,
+                               ode_control = list(max_steps = 10000000, step_size_min = 1e-10,debug_record_step_times = TRUE))
+```
+
+```{r, eval=TRUE}
+start = Sys.time()
+
+index_S_all <- model$info()$index$S_all
+index_I <- model$info()$index$I
+index_A <- model$info()$index$A
+index_C <- model$info()$index$C
+index_S <- model$info()$index$S
+index_Iij <- model$info()$index$I_ij
+index_Aij <- model$info()$index$A_ij
+index_H <- model$info()$index$H
+index_R <- model$info()$index$R
+
+index_S_v_all <- model$info()$index$S_v_all
+index_I_v <- model$info()$index$I_v
+index_A_v <- model$info()$index$A_v
+index_C_v <- model$info()$index$C_v
+index_S_v <- model$info()$index$S_v
+index_I_v_ij <- model$info()$index$I_v_ij
+index_A_v_ij <- model$info()$index$A_v_ij
+index_H_v <- model$info()$index$H_v
+index_R_v <- model$info()$index$R_v
+
+index_Sm <- model$info()$index$S_m
+index_Em <- model$info()$index$E_m
+index_Im <- model$info()$index$I_m
+
+index_pri_symp <- model$info()$index$inc_primary_symp
+index_sec_symp <- model$info()$index$inc_secondary_symp
+index_pri_inf <- model$info()$index$inc_primary_inf
+index_sec_inf <- model$info()$index$inc_secondary_inf
+index_hosp <- model$info()$index$inc_hosp
+
+
+index_pri_symp_v <- model$info()$index$inc_primary_symp_v
+index_sec_symp_v <- model$info()$index$inc_secondary_symp_v
+index_pri_inf_v <- model$info()$index$inc_primary_inf_v
+index_sec_inf_v <- model$info()$index$inc_secondary_inf_v
+index_hosp_v <- model$info()$index$inc_hosp_v
+
+
+index_foimos <- model$info()$index$mos_foi
+index_foihum <- model$info()$index$hum_foi
+index_N_age <- model$info()$index$N_total_age
+index_total_pop_age <- model$info()$index$total_pop_age
+
+out <- model$simulate(tt)
+end = Sys.time()
+
+print(end-start)
+
+
+# saveRDS(out, sprintf("output/out_vac_%s.rds",vac_rate0), compress = TRUE)
+```
+
+### yearly sero function
+
+```{r, eval=TRUE}
+## function for calculating yearly infection serotype wise
+calc_year_sero <- function(arr){
+  
+  ## this is for primary infection, where input has only 3 dimensions: (age, serotype, time)
+  if (length(dim(arr)) == 3){
+    arr_sero <- apply(arr, c(2,3), sum) ## summing over age, i.e., 1st dimension
+    arr_sero_yearly <- t(apply(arr_sero, 1, calc_yearly))
+  }
+  
+    ## this is for secondary infection, where input has only 4 dimensions: (age, serotype, serotype,  time)
+  if (length(dim(arr)) == 4){
+    arr_sero <- apply(arr, c(2,4), sum) ## summing over age, serotype(recovered from) i.e., 1st, & 2nd  dimension
+    arr_sero_yearly <- t(apply(arr_sero, 1, calc_yearly))
+  }
+  
+  return(arr_sero_yearly)
+}
+
+
+calc_year_sero_wo_sum <- function(arr){
+  
+    if (length(dim(arr)) == 2){
+    arr_sero <- arr
+    arr_sero_yearly <- t(apply(arr_sero, 1, calc_yearly_wo_sum))
+  }
+  
+  
+  ## this is for primary infection, where input has only 3 dimensions: (age, serotype, time)
+  if (length(dim(arr)) == 3){
+    arr_sero <- apply(arr, c(2,3), sum) ## summing over age, i.e., 1st dimension
+    arr_sero_yearly <- t(apply(arr_sero, 1, calc_yearly_wo_sum))
+  }
+  
+    ## this is for secondary infection, where input has only 4 dimensions: (age, serotype, serotype,  time)
+  if (length(dim(arr)) == 4){
+    arr_sero <- apply(arr, c(2,4), sum) ## summing over age, serotype(recovered from) i.e., 1st, & 2nd  dimension
+    arr_sero_yearly <- t(apply(arr_sero, 1, calc_yearly_wo_sum))
+  }
+  
+  return(arr_sero_yearly)
+  }
+
+
+## function for calculating yearly infection age wise
+calc_year_age <- function(arr){
+  
+   if (length(dim(arr)) == 2){
+    arr_age <- arr
+    arr_age_yearly <- t(apply(arr_age, 1, calc_yearly))
+  }
+  
+  ## this is for primary infection, where input has only 3 dimensions: (age, serotype, time)
+  if (length(dim(arr)) == 3){
+    arr_age <- apply(arr, c(1,3), sum) ## summing over sero, i.e., 2nd dimension
+    arr_age_yearly <- t(apply(arr_age, 1, calc_yearly))
+  }
+  
+  if (length(dim(arr)) == 4){
+    arr_age <- apply(arr, c(1,4), sum) ## summing over sero(infeced by), serotype(recovered from) i.e., 2nd, & 3rd  dimension
+    arr_age_yearly <- t(apply(arr_age, 1, calc_yearly))
+  }
+  
+  return(arr_age_yearly)
+}
+
+calc_year_age_wo_sum <- function(arr){
+  
+   if (length(dim(arr)) == 2){
+    arr_age <- arr
+    arr_age_yearly <- t(apply(arr_age, 1, calc_yearly_wo_sum))
+  }
+  
+  ## this is for primary infection, where input has only 3 dimensions: (age, serotype, time)
+  if (length(dim(arr)) == 3){
+    arr_age <- apply(arr, c(1,3), sum) ## summing over sero, i.e., 2nd dimension
+    arr_age_yearly <- t(apply(arr_age, 1, calc_yearly_wo_sum))
+  }
+  
+  if (length(dim(arr)) == 4){
+    arr_age <- apply(arr, c(1,4), sum) ## summing over sero(infeced by), serotype(recovered from) i.e., 2nd, & 3rd  dimension
+    arr_age_yearly <- t(apply(arr_age, 1, calc_yearly_wo_sum))
+  }
+  
+  return(arr_age_yearly)
+  }
+
+
+## function for calculating yearly infection
+calc_yearly <- function(mat){
+  tapply(mat, (seq_along(mat) - 1) %/%365, sum)
+}
+
+calc_yearly_wo_sum <- function(mat){
+  # tapply(mat, (seq_along(mat) - 1) %/%365, sum)
+  mat[seq(1,length(t),by=365)]
+  }
+```
+
+### total population
+
+```{r, eval=TRUE}
+year <- as.numeric(begin_year):((as.numeric(begin_year)+sim_year-1))
+tot_pop <- colSums(out[index_total_pop_age,,])
+tot_pop_yearly <- tot_pop[seq(1,length(t),by=365)]
+```
+
+### symptomatic infection
+
+```{r, eval=TRUE}
+pri_symp_age_sero <- array(out[index_pri_symp,,], dim=c(n_age, n_sero,length(t)))
+sec_symp_age_sero <- array(out[index_sec_symp,,], dim=c(n_age, n_sero,length(t)))
+tot_symp_age_yearly <- calc_year_age(pri_symp_age_sero) + calc_year_age(sec_symp_age_sero)
+tot_symp_yearly <- 1e+05*colSums(tot_symp_age_yearly)/tot_pop_yearly
+# tot_symp_yearly <- colSums(tot_symp_age_yearly)
+
+
+data_reported_yearly = read_xlsx("~/codes/dengue_main/data/serotype_share_age_cases.xlsx",
+                         sheet="yearly_reported_cases")
+
+reported_cases_data <- data_reported_yearly[data_reported_yearly$year %in% 2013:2021,]
+
+
+plot(year[1:length(year)],tot_symp_yearly[1:length(tot_symp_yearly)], type="l", col="blue", xlim=c(2013,2102), xlab = "Year", ylab="Annual reported cases per 100k")+
+  lines(reported_cases_data$year, reported_cases_data$cases_p_100k,, type="o", col="red")
+
+legend(x = "topright",
+       text.col = "black",
+       legend=c("Annual reported cases (Model)","Annual reported cases (Data)"),
+       fill = c("blue", "red"))
+```
+
+## foi from direct calculation
+```{r, eval=TRUE}
+foi_mos <- colSums(array(out[index_foimos,,], dim=c(n_sero,length(t))))
+# foi_hum <- colSums(array(out[index_foihum,,], dim=c(n_sero,length(t))))
+
+yearly_foi_mos <- tapply(foi_mos, (seq_along(foi_mos) - 1) %/%365, sum)
+# yearly_foi_hum <- tapply(foi_hum, (seq_along(foi_hum) - 1) %/%365, sum)
+
+year <- as.numeric(begin_year):((as.numeric(begin_year)+sim_year-1))
+
+plot(year, yearly_foi_mos, type="o", ylab="FOI mos", xlab="year", lwd=2 )+
+  lines(year, rep(0.01,length(year)), col="red")
+
+# plot(year, yearly_foi_hum, type="l", ylab="FOI hum", xlab="year", lwd=2 )
+```
+
+
+
+### total infection
+```{r, eval=TRUE}
+C_age_sero <- array(out[index_C,,], dim = c(n_age, n_sero,length(t)))
+S_age_sero <- array(out[index_S,,], dim=c(n_age, n_sero,length(t)))
+R_age <- array(out[index_R,,], dim=c(n_age,length(t)))
+
+
+## susceptible population in different compartments
+# yearly_pri_sus_age <- calc_year_age_wo_sum(array(out[index_S_all,,], dim=c(n_age,length(t))))
+# yearly_sec_sus_age <- calc_year_age_wo_sum(S_age_sero)
+# 
+# yearly_sec_sus_sero <- calc_year_sero_wo_sum(S_age_sero)
+# 
+# yearly_tot_sus <- colSums(yearly_pri_sus_age) + colSums(yearly_sec_sus_age)
+
+
+pri_inf_age_sero <- array(out[index_pri_inf,,], dim=c(n_age, n_sero,length(t)))
+sec_inf_age_sero <- array(out[index_sec_inf,,], dim=c(n_age,n_sero,length(t)))
+
+pri_inf_age <- apply(pri_inf_age_sero, c(1,3), sum)  # Sum over the second dimension (n_sero)
+sec_inf_age <- apply(sec_inf_age_sero, c(1,3), sum)  
+
+total_infection <- colSums(pri_inf_age) + colSums(sec_inf_age)
+total_pri_inf <- colSums(pri_inf_age)
+total_sec_inf <- colSums(sec_inf_age)
+
+
+yearly_pri_infection <-  tapply(total_pri_inf, (seq_along(total_pri_inf) - 1) %/%365, sum)
+yearly_sec_infection <-  tapply(total_sec_inf, (seq_along(total_sec_inf) - 1) %/%365, sum)
+
+
+
+yearly_tot_infection <-  tapply(total_infection, (seq_along(total_infection) - 1) %/%365, sum)
+year <- as.numeric(begin_year):((as.numeric(begin_year)+sim_year-1))
+frac_inf <- 100*yearly_tot_infection/tot_pop_yearly
+
+# 
+# plot(year,100000*yearly_pri_infection/tot_pop_yearly, type="o", xlab="year", ylab = "Primary Infection(per 100k)", col="red") +
+# lines(year,100000*yearly_sec_infection/tot_pop_yearly,type="o", xlab="year", ylab = "Secondary Infection(per 100k)", col="blue")
+# 
+# 
+
+plot(year,frac_inf, xlab="year", ylab = "Infection(%)")+
+  lines(year,0*frac_inf, col="red", type="l")
+# 
+# 
+# plot(tail(year,60),tail(frac_inf,60), xlab="year", ylab = "Infection")
+# 
+# 
+# yearly_foi <- yearly_tot_infection/yearly_tot_sus
+# plot(year, yearly_foi, xlab="year", ylab = "FOI")+
+#   lines(year,0*yearly_foi, col="red", type="l")+
+#   lines(year, rep(0.01, length(year)), type="l", col="blue")
+# 
+# 
+# plot(tail(year,60),tail(yearly_foi,60), xlab="year", ylab = "FOI")
+# 
+# 
+# plot(year,yearly_tot_sus, type="l", ylim=c(0,4400000))+
+#   lines(year, yearly_tot_infection, type="l", col="red")
+
+```
+#### Sero prevalence from model
+```{r, eval=TRUE}
+
+yearly_total_sero_age <- calc_year_age_wo_sum(C_age_sero) + calc_year_age_wo_sum(S_age_sero) + calc_year_age_wo_sum(R_age)
+
+pop_age <- out[index_N_age,,]
+
+# pop_age <- out[index_total_pop_age,,]
+
+yearly_pop_age <- calc_year_age_wo_sum(pop_age)
+
+
+yearly_sero_prevalence <- 100*yearly_total_sero_age/yearly_pop_age
+
+
+# err <- array(NA, dim=(dim(yearly_sero_prevalence)[2]))
+# for (i in 1:(dim(yearly_sero_prevalence)[2])){
+#   err[i] <- sum(100*sero_p -  yearly_sero_prevalence[,i])^2
+# }
+# 
+# min_err <- which.min(err[2:length(err)])
+# 
+# ind_err <- min_err +1
+
+## choose the initial condition for which sero-prevalence data matches well
+# init <- array(out[,,(37*365)],dim=c(dim(out)[1],1))
+
+
+plot(1:n_age,100*sero_p, xlab="Age", ylab="Sero-prevalence",type="o", col="red", lwd=2, ylim=c(0,100))+
+  lines(1:n_age,yearly_sero_prevalence[,1],type="o", col="blue", lwd=2)+
+  lines(1:n_age,yearly_sero_prevalence[,8],type="o", col="darkgreen", lwd=2)+
+    lines(1:n_age,yearly_sero_prevalence[,24],type="o", col="darkorange", lwd=2)
+legend(x = "bottomright",
+       text.col = "black",
+       legend=c("2013(data)","2013(Model)", "2021", "2037"),
+       fill = c("red", "blue", "darkgreen", "darkorange"))
+
+```
+
+
+### serotype wise infection
+```{r, eval=TRUE}
+pri_inf_age_sero <- array(out[index_pri_inf,,], dim=c(n_age, n_sero,length(t)))
+sec_inf_age_sero <- array(out[index_sec_inf,,], dim=c(n_age,n_sero,length(t)))
+
+yearly_pri_inf_sero <- calc_year_sero(pri_inf_age_sero)
+yearly_sec_inf_sero <- calc_year_sero(sec_inf_age_sero)
+
+# yearly_total_infection_sero <- pri_inf_sero + sec_inf_sero
+
+year <- as.numeric(begin_year):((as.numeric(begin_year)+sim_year-1))
+
+matplot(year,1e+05*t(yearly_pri_inf_sero)/tot_pop_yearly, type="l",lwd=2, xlab="year", ylab = "Primary infection per 100k", col= c("red", "blue", "darkgreen", "black"), ylim=c(0,2000))
+legend(x = "topright",
+       text.col = "black",
+       legend=c("D-1","D-2", "D-3", "D-4"),
+       fill = c("red", "blue", "darkgreen", "black"))
+
+matplot(year,1e+05*t(yearly_sec_inf_sero)/tot_pop_yearly, type="l", lwd=2, xlab="year", ylab = "Secondary Infection per 100k", col= c("red", "blue", "darkgreen", "black"),  ylim=c(0,2000))
+legend(x = "topright",
+       text.col = "black",
+       legend=c("D-1","D-2", "D-3", "D-4"),
+       fill = c("red", "blue", "darkgreen", "black"))
+# 
+# 
+# plot(year, yearly_pri_inf_sero[1,], type="l")+
+#   lines(year,yearly_sec_inf_sero[1,], type="l", col="red")
+
+# ### plot the mosquitoes
+# 
+# mos_inf <- out[index_Im,,]
+# mos_exp <- out[index_Em,,]
+# 
+# yearly_mos_inf <- calc_year_sero_wo_sum(mos_inf)
+# 
+# matplot(year, t(yearly_mos_inf), type="l", lwd=2, xlab="year", ylab = "Infected mosquitoes", col= c("red", "blue", "darkgreen", "black"))
+# 
+# legend(x = "topright",
+#        text.col = "black",
+#        legend=c("D-1","D-2", "D-3", "D-4"),
+#        fill = c("red", "blue", "darkgreen", "black"))
+  
+
+# matplot(t(mos_exp), type="l", lwd=2,  col= c("red", "blue", "darkgreen", "black"))
+# 
+# 
+# matplot(year, t(yearly_sec_sus_sero),  type="l", lwd=2, xlab="year", ylab = "Sus to secondary", col= c("red", "blue", "darkgreen", "black"))
+# legend(x = "topright",
+#        text.col = "black",
+#        legend=c("D-1","D-2", "D-3", "D-4"),
+#        fill = c("red", "blue", "darkgreen", "black"))
+```
+## Serotype distribution
+
+```{r}
+
+
+
+```
+
+### age wise symptomatic infection
+
+```{r eval=FALSE}
+
+pri_symp_age_sero <- array(out[index_pri_symp,,], dim=c(n_age, n_sero,length(t)))
+sec_symp_age_sero <- array(out[index_sec_symp,,], dim=c(n_age, n_sero,length(t)))
+tot_symp_age_yearly <- calc_year_age(pri_symp_age_sero) + calc_year_age(sec_symp_age_sero)
+
+### age-groups for which we have info on reported cases
+### "0-4y", "5-14y", "15-24y", "25-34y", "35-44y", "45-54y", "55-64y", "65+y"
+
+# age_groups_array <- c(1,5,6,15,16,25,26,35,36,45,46,55,56,65,66,91) 
+
+pop_age <- out[index_N_age,,]
+
+yearly_pop_age <- calc_year_age_wo_sum(pop_age)
+
+## now calculate the age-specific incidence per 100k population
+
+symp_age_0_4_yearly <- 1e+05*colSums(tot_symp_age_yearly[1:5,])/colSums(yearly_pop_age[1:5,])
+symp_age_5_14_yearly <- 1e+05*colSums(tot_symp_age_yearly[6:15,])/colSums(yearly_pop_age[6:15,])
+symp_age_15_24_yearly <- 1e+05*colSums(tot_symp_age_yearly[16:25,])/colSums(yearly_pop_age[16:25,])
+symp_age_25_34_yearly <- 1e+05*colSums(tot_symp_age_yearly[26:35,])/colSums(yearly_pop_age[26:35,])
+symp_age_35_44_yearly <- 1e+05*colSums(tot_symp_age_yearly[36:45,])/colSums(yearly_pop_age[36:45,])
+symp_age_45_54_yearly <- 1e+05*colSums(tot_symp_age_yearly[46:55,])/colSums(yearly_pop_age[46:55,])
+symp_age_55_64_yearly <- 1e+05*colSums(tot_symp_age_yearly[56:65,])/colSums(yearly_pop_age[56:65,])
+symp_age_65p_yearly <- 1e+05*colSums(tot_symp_age_yearly[66:91,])/colSums(yearly_pop_age[66:91,])
+
+symp_age_rep_yearly <- rbind(symp_age_0_4_yearly,symp_age_5_14_yearly,
+                             symp_age_15_24_yearly,symp_age_25_34_yearly,
+                             symp_age_35_44_yearly,symp_age_45_54_yearly,
+                             symp_age_55_64_yearly,symp_age_65p_yearly)
+
+## data
+data_reported_age_yearly = read_xlsx("~/codes/dengue_main/data/serotype_share_age_cases.xlsx",
+                         sheet="age_case_2014_20")
+ 
+df_age_rep_cases <- select(data_reported_age_yearly, year,contains("_inc_") )
+
+
+## plot w.r.t age
+
+par(mfrow = c(1, 1), mar = c(3, 3, 1, 1), mgp = c(1.5, 0.5, 0), bty = "n")
+
+matplot(t(df_age_rep_cases[,-which(names(df_age_rep_cases)=="year")]), type="l", col="gray") +
+  lines (rowSums(symp_age_rep_yearly[1:8,2:8])/7,type="o",col="red")
+
+
+
+
+
+
+
+### plot w.r.to time
+par(mfrow = c(4, 2), mar = c(3, 3, 1, 1), mgp = c(1.5, 0.5, 0), bty = "n")
+
+plot(year[2:9],symp_age_rep_yearly[1,2:9], type="l", col="blue", xlim=c(2014,2020), ylim=c(0,1000),xlab = "Year", ylab="0-4 years per 100k")+
+  lines(df_age_rep_cases$year, df_age_rep_cases$`0-4y_inc_p_100k`, type="o", col="red")
+legend(x = "topright",
+       text.col = "black",
+       legend=c("Annual reported cases (Model)","Annual reported cases (Data)"),
+       fill = c("blue", "red"))
+
+plot(year[2:9],symp_age_rep_yearly[2,2:9], type="l", col="blue", xlim=c(2014,2020), ylim=c(0,500),xlab = "Year", ylab="5-14y per 100k")+
+  lines(df_age_rep_cases$year, df_age_rep_cases$`5-14y_inc_p_100k`, type="o", col="red")
+
+plot(year[2:9],symp_age_rep_yearly[3,2:9], type="l", col="blue", xlim=c(2014,2020), ylim=c(0,1000),xlab = "Year", ylab="15-24y per 100k")+
+  lines(df_age_rep_cases$year, df_age_rep_cases$`15-24y_inc_p_100k`, type="o", col="red")
+
+plot(year[2:9],symp_age_rep_yearly[4,2:9], type="l", col="blue", xlim=c(2014,2020), ylim=c(0,1000),xlab = "Year", ylab="25-34y per 100k")+
+  lines(df_age_rep_cases$year, df_age_rep_cases$`25-34y_inc_p_100k`, type="o", col="red")
+
+plot(year[2:9],symp_age_rep_yearly[5,2:9], type="l", col="blue", xlim=c(2014,2020), ylim=c(0,1000),xlab = "Year", ylab="35-44y per 100k")+
+  lines(df_age_rep_cases$year, df_age_rep_cases$`35-44y_inc_p_100k`, type="o", col="red")
+
+plot(year[2:9],symp_age_rep_yearly[6,2:9], type="l", col="blue", xlim=c(2014,2020), ylim=c(0,1000),xlab = "Year", ylab="45-54y per 100k")+
+  lines(df_age_rep_cases$year, df_age_rep_cases$`45-54y_inc_p_100k`, type="o", col="red")
+
+plot(year[2:9],symp_age_rep_yearly[7,2:9], type="l", col="blue", xlim=c(2014,2020), ylim=c(0,800),xlab = "Year", ylab="55-64y per 100k")+
+  lines(df_age_rep_cases$year, df_age_rep_cases$`55-64y_inc_p_100k`, type="o", col="red")
+
+plot(year[2:9],symp_age_rep_yearly[8,2:9], type="l", col="blue", xlim=c(2014,2020), ylim=c(0,600),xlab = "Year", ylab="65+y per 100k")+
+  lines(df_age_rep_cases$year, df_age_rep_cases$`65+y_inc_p_100k`, type="o", col="red")
+
+
+
+```
+
+
+
+
+
+
+
+
+## Vaccine w/o vaccine comparison
+```{r eval=TRUE}
+
+out_model_annual <- function(res) {
+  
+## total population
+tot_pop <- colSums(res[index_total_pop_age,,])
+tot_pop_yearly <- calc_yearly_wo_sum(tot_pop)
+
+
+## Annual incidence of infection
+pri_inf_age_sero <- array(res[index_pri_inf,,], dim = c(n_age, n_sero,length(t)))
+sec_inf_age_sero <- array(res[index_sec_inf,,], dim = c(n_age,n_sero,length(t)))
+tot_inf_age_yearly <- calc_year_age(pri_inf_age_sero) + calc_year_age(sec_inf_age_sero)
+
+pri_inf_age_sero_v <- array(res[index_pri_inf_v,,], dim = c(n_age, n_sero,length(t)))
+sec_inf_age_sero_v <- array(res[index_sec_inf_v,,], dim = c(n_age,n_sero,length(t)))
+tot_inf_age_yearly_v <- calc_year_age(pri_inf_age_sero_v) + calc_year_age(sec_inf_age_sero_v)
+
+tot_inf_yearly <-  1e+05*(colSums(tot_inf_age_yearly) + colSums(tot_inf_age_yearly_v))/tot_pop_yearly
+
+
+## Annual incidence of reported cases
+pri_symp_age_sero <- array(res[index_pri_symp,,], dim = c(n_age, n_sero,length(t)))
+sec_symp_age_sero <- array(res[index_sec_symp,,], dim = c(n_age, n_sero,length(t)))
+tot_symp_age_yearly <- calc_year_age(pri_symp_age_sero) + calc_year_age(sec_symp_age_sero)
+
+pri_symp_age_sero_v <- array(res[index_pri_symp_v,,], dim = c(n_age, n_sero,length(t)))
+sec_symp_age_sero_v <- array(res[index_sec_symp_v,,], dim = c(n_age, n_sero,length(t)))
+tot_symp_age_yearly_v <- calc_year_age(pri_symp_age_sero_v) + calc_year_age(sec_symp_age_sero_v)
+
+tot_symp_yearly <- 1e+05*(colSums(tot_symp_age_yearly) + colSums(tot_symp_age_yearly_v))/tot_pop_yearly
+
+
+
+
+## Annual incidence of hospitalization
+hosp_age <- array(res[index_hosp,,], dim = c(n_age,length(t)))
+hosp_age_v <- array(res[index_hosp_v,,], dim = c(n_age,length(t)))
+
+hosp_age_yearly <- calc_year_age(hosp_age) + calc_year_age(hosp_age_v)
+
+tot_hosp_yearly <- 1e+05*(colSums(hosp_age_yearly))/tot_pop_yearly
+
+
+return(list(cases = tot_symp_yearly,infection = tot_inf_yearly, hosp = tot_hosp_yearly))
+}
+```
+## loading the data
+```{r}
+out_nv <- readRDS("output/out_vac_0.rds")
+
+out_v <- readRDS("output/out_vac_0.5.rds")
+
+## calculate reported cases
+nv_out <- out_model_annual(res = out_nv)
+  
+v_out <- out_model_annual(res = out_v) 
+```
+
+## Plotiing
+```{r}
+# Time line 
+year <- as.numeric(begin_year):((as.numeric(begin_year) + sim_year - 1))
+
+
+par(mfrow = c(3, 1), mar = c(3, 3, 1, 1), mgp = c(1.5, 0.5, 0), bty = "n")
+
+## Plot annual infection
+plot(year,nv_out$infection, type = "b", lwd = 2, col = "darkred", xaxt = "n", xlab = "Year", xlim = c(year[1], year[length(year)]), ylim = c(0,max(nv_out$infection, v_out$infection)), ylab = "Annual inf. per 100k") + 
+  lines(year,v_out$infection, type = "b", lwd = 2, col = "darkgreen")  +
+  abline(v = 2024, col = "gray", lwd = 2, lty = 2) +
+  abline(v = 2043, col = "gray", lwd = 2, lty = 2)
+
+axis(1, at = seq(year[1], year[length(year)], by = 10))
+
+legend(2020,7000,
+       text.col = "black",
+       text.font = 2,
+       legend = c("Without vaccine","With vaccine"),
+       fill = c("darkred", "darkgreen"))
+
+
+
+## plot annual cases
+plot(year,nv_out$cases, type = "b", lwd = 2, col = "darkred", xaxt = "n", xlab = "Year", ylim = c(0,max(nv_out$cases, v_out$cases)), ylab = "Annual cases per 100k") + 
+  lines(year,v_out$cases, type = "b", lwd = 2, col = "darkgreen") +
+  abline(v = 2024, col = "gray", lwd = 2, lty = 2) +
+  abline(v = 2043, col = "gray", lwd = 2, lty = 2)
+
+axis(1, at = seq(year[1], year[length(year)], by = 10))
+## plot hospitalization
+plot(year,nv_out$hosp, type = "b", lwd = 2, col = "darkred", xaxt = "n", xlab = "Year", ylim = c(0,max(nv_out$hosp, v_out$hosp)), ylab = "Annual hosp. per 100k") + 
+  lines(year,v_out$hosp, type = "b", lwd = 2, col = "darkgreen") +
+  abline(v = 2024, col = "gray", lwd = 2, lty = 2) +
+  abline(v = 2043, col = "gray", lwd = 2, lty = 2)
+
+axis(1, at = seq(year[1], year[length(year)], by = 10))
+
+
+
+## Annual incidence of DHF (need to think whether to include or not!)
+
+```
+
+
+
+
+
+
+```{r}
+
+simple_sir <- odin.dust::odin_dust({
+
+N <- S + I + R
+
+deriv(S) <- lam*N - beta*S*I/N - mu*S
+
+deriv(I) <- beta*S*I/N - (gamma + mu)*I
+
+deriv(R) <- gamma*I - mu*R
+
+deriv(y) <- if (as.integer(t) %% 30 == 0) (beta*S*I/N - y)  else beta*S*I/N
+
+
+deriv(cum_inc[1:5]) <- if (as.integer(t) >= lo[i] && as.integer(t) <= u[i] ) beta*S*I/N else 0
+
+infection[1:5] <-  if (as.integer(t) >= lo[i] && as.integer(t) <= u[i] ) cum_inc[i] else 0
+
+output(x) <- sum(infection[])
+
+output(inc) <- beta*S*I/N
+
+lo[] <- l_t[i]
+u[] <- u_t[i]
+
+## Initial conditions
+initial(S) <- S0
+initial(I) <- I0
+initial(R) <- R0
+initial(y) <- y0
+initial(cum_inc[]) <- cum_inc0[i]
+dim(cum_inc0) <- 5
+dim(cum_inc) <- 5
+dim(lo) <- 5
+dim(u) <- 5
+dim(l_t) <- 5
+dim(u_t) <- 5
+l_t[] <- user()
+u_t[] <- user()
+
+
+## Parameters
+lam <- user()
+mu <- user()
+beta  <- user()
+gamma <- user()
+dim(infection) <- 5
+# dim(x) <- 4
+
+
+I0 <- user()
+R0 <- user()
+S0 <- user()
+cum_inc0[] <- user()
+y0 <- user()
+})
+
+
+final_time = 150
+t <- seq(1,final_time, by = 1)
+
+
+
+## parameters & Initial conditions
+tot <- 10000
+lam <- (1/(83*365))
+beta  <- 0.2
+gamma <- 0.1
+
+mu <- lam
+I0 <- 1
+R0 <- 0
+S0 <- tot - (I0 + R0)
+cum_inc0 <- c((beta*S0*I0/tot),0,0,0,0) #beta*I0
+y0 <- beta*S0*I0/tot
+
+l_t <- c(1,30,60,90,120)
+u_t <- c(30,60,90,120, 150)
+# cum_inc10 <- 0
+
+
+pars <- list(lam = lam,
+            beta = beta,
+            gamma = gamma,
+            mu = mu,
+            S0 = S0,
+            I0 = I0,
+            R0 = R0,
+            cum_inc0 = cum_inc0,
+            y0 = y0,
+            l_t = l_t,
+            u_t = u_t)
+
+
+
+model <- simple_sir$new(pars, time = 1, n_particles = 1,
+                            ode_control = list(max_steps = 10000000))
+
+out_sir <- model$simulate(t)
+
+ind_cuminc = model$info()$index$cum_inc
+ind_S = model$info()$index$S
+ind_I = model$info()$index$I
+ind_R = model$info()$index$R
+ind_x = model$info()$index$x
+ind_y = model$info()$index$y
+
+ind_infection = model$info()$index$infection
+
+ind_inc = model$info()$index$inc
+
+
+a = out_sir[ind_x,,][c(30,60,90,120,150)]
+b = tapply(out_sir[ind_inc,,], (seq_along(out_sir[ind_inc,,]) - 1) %/% 30, sum)
+c = out_sir[ind_y,,][c(30,60,90,120,150)]
+
+# plot(t,(out_sir[ind_cuminc,,]), type="l")
+
+# +
+plot(a, type = "l", col = "blue") + lines(b, col="red") + lines(c, col = "darkgreen")
+
+# plot(t,(out_sir[ind_I,,]), type="l", col="blue")
+
+
+```
+
+
+<!-- ```{r} -->
+
+<!-- sirodindust <- odin.dust::odin_dust({ -->
+
+
+<!--   ## Definition of the time-step and output as "time" -->
+<!--   dt <- user() -->
+<!--   initial(time) <- 0 -->
+<!--   update(time) <- (step + 1) * dt -->
+
+<!--   # print("{step}") -->
+<!--   ## Core equations for transitions between compartments: -->
+<!--   # update(S) <- S - n_SI -->
+<!--   # update(I) <- I + n_SI - n_IR -->
+<!--   # update(R) <- R + n_IR -->
+<!--   #  -->
+<!--   update(inc) <- if (step %% 5 == 0) 0 else 1 + inc -->
+<!--   #  -->
+<!--   #  -->
+<!--   #  -->
+<!--   # ## Individual probabilities of transition: -->
+<!--   # p_SI <- 1 - exp(-beta * I / N * dt) # S to I -->
+<!--   # p_IR <- 1 - exp(-gamma * dt) # I to R -->
+<!--   #  -->
+<!--   # ## Draws from binomial distributions for numbers changing between -->
+<!--   # ## compartments: -->
+<!--   # n_IR <- rbinom(I, p_IR) -->
+<!--   # n_SI <- rbinom(S, p_SI) -->
+<!--   #  -->
+<!--   # ## Total population size -->
+<!--   # N <- S + I + R -->
+<!--   #  -->
+<!--   # ## Initial states: -->
+<!--   # initial(S) <- S_ini -->
+<!--   # initial(I) <- I_ini -->
+<!--   # initial(R) <- 0 -->
+<!--   initial(inc) <- 0 -->
+
+<!--   # ## User defined parameters - default in parentheses: -->
+<!--   # S_ini <- user(1000) -->
+<!--   # I_ini <- user(10) -->
+<!--   # beta <- user(0.2) -->
+<!--   # gamma <- user(0.1) -->
+<!-- },debug_enable = TRUE) -->
+
+<!-- ### Initializing the model -->
+<!-- sir_model <- sirodindust$new(pars = list(dt = 1), -->
+<!--                                        # S_ini = 1000, -->
+<!--                                        # I_ini = 10, -->
+<!--                                        # beta = 0.2, -->
+<!--                                        # gamma = 0.1), -->
+<!--                            time = 1, -->
+<!--                            n_particles = 1L, -->
+<!--                            n_threads = 1L, -->
+<!--                            seed = 10L) -->
+
+<!-- # sir_model$run(10) ### will genrate at time=10, the values of state variables -->
+
+<!-- end_step=10 -->
+<!-- dt=1 -->
+<!-- steps <- seq(0, end_step/dt, by = 1) -->
+
+<!-- ### sir_odin_dust -->
+
+<!-- n_times <- 200 -->
+<!-- x <- array(NA, dim = c(sir_model$info()$len, n_particles=1, n_times)) -->
+
+<!-- for (t in seq_len(n_times)) { -->
+<!--   x[ , , t] <- sir_model$run(t) -->
+<!-- } -->
+<!-- # time <- x[1, 1, ] -->
+<!-- # x <- x[-1, , ] -->
+<!-- ``` -->
+
+

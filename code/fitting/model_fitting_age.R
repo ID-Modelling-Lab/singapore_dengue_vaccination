@@ -1,15 +1,16 @@
 
+
+
+
 # total population
-N <- sum(S_all[]) + sum(I[,]) + sum(A[,]) + sum(C[,]) + sum(S[,]) +
-  sum(I_ij[,]) + sum(A_ij[,]) + sum(H[]) + sum(R[])
+N <- sum(S_all[]) + sum(I[,]) + sum(C[,]) + sum(S[,]) + sum(I_ij[,]) + sum(R[])
 
 
-infected_hum[] <- sum(I[,i]) + kai*sum(A[,i]) + sum(I_ij[,i]) + kai*sum(A_ij[,i]) 
+infected_hum[] <- sum(I[,i]) + sum(I_ij[,i]) 
 
 
 ## population each age group
-N_age[] <- S_all[i] + sum(I[i,]) + sum(A[i,]) + sum(C[i,]) + sum(S[i,]) +
-  sum(I_ij[i,]) + sum(A_ij[i,]) + H[i] + R[i]
+N_age[] <- S_all[i] + sum(I[i,]) + sum(C[i,]) + sum(S[i,]) + sum(I_ij[i,]) + R[i]
 
 
 beta_m[1] <- beta_m1
@@ -29,7 +30,7 @@ S_sec[] <- sum(S[i,])
 
 ## age-specific symptomatic infection
 age_symp_inf_pri[] <- rho_1[i]*sum(foi_mos[])*S_all[i] 
-age_sero_symp_inf_sec[,] <- (sum(foi_mos[]) - foi_mos[j])*S[i,j]  
+age_sero_symp_inf_sec[,] <- foi_mos[j]*(S_sec[i] - S[i,j]) #(sum(foi_mos[]) - foi_mos[j])*S[i,j]  
 age_symp_inf_sec[] <-  rho_2[i]*sum(age_sero_symp_inf_sec[i,])
 
 
@@ -40,57 +41,36 @@ deriv(S_all[1]) <- lambda_hum*N - sum(foi_mos[])*S_all[i] - death_hum*S_all[i] -
 deriv(S_all[2:n_age]) <- -sum(foi_mos[])*S_all[i] - death_hum*S_all[i] +
   age_rate[i-1]*S_all[i-1] - age_rate[i]*S_all[i] 
 
-deriv(I[1,1:n_sero]) <- rho_1[i]*foi_mos[j]*S_all[i] - (gamma_1+xi_1+death_hum)*I[i,j] - 
+deriv(I[1,1:n_sero]) <- foi_mos[j]*S_all[i] - (gamma_1+death_hum)*I[i,j] - 
   age_rate[i]*I[i,j]
 
-deriv(I[2:n_age,1:n_sero]) <- rho_1[i]*foi_mos[j]*S_all[i] - (gamma_1+xi_1+death_hum)*I[i,j] + 
+deriv(I[2:n_age,1:n_sero]) <- foi_mos[j]*S_all[i] - (gamma_1+death_hum)*I[i,j] + 
   age_rate[i-1]*I[i-1,j] - age_rate[i]*I[i,j]
 
-deriv(A[1,1:n_sero]) <- (1-rho_1[i])*foi_mos[j]*S_all[i] - (gamma_1+death_hum)*A[i,j] - 
-  age_rate[i]*A[i,j]
-
-deriv(A[2:n_age,1:n_sero]) <- (1-rho_1[i])*foi_mos[j]*S_all[i] - (gamma_1+death_hum)*A[i,j] + 
-  age_rate[i-1]*A[i-1,j] - age_rate[i]*A[i,j]
-
-deriv(C[1,1:n_sero]) <- gamma_1*I[i,j]+ gamma_1*A[i,j] - (alpha + death_hum)*C[i,j] - 
+deriv(C[1,1:n_sero]) <- gamma_1*I[i,j] - (alpha + death_hum)*C[i,j] - 
   age_rate[i]*C[i,j] 
 
-deriv(C[2:n_age,1:n_sero]) <- gamma_1*I[i,j]+ gamma_1*A[i,j] - (alpha + death_hum)*C[i,j] + 
+deriv(C[2:n_age,1:n_sero]) <- gamma_1*I[i,j] - (alpha + death_hum)*C[i,j] + 
   age_rate[i-1]*C[i-1,j] - age_rate[i]*C[i,j] 
 
 deriv(S[1,1:n_sero ]) <- alpha*C[i,j] - (sum(foi_mos[]) - foi_mos[j])*S[i,j] - death_hum*S[i,j] - 
   age_rate[i]*S[i,j] 
 
-deriv(S[2:n_age,1:n_sero ]) <- alpha*C[i,j] -  (sum(foi_mos[]) - foi_mos[j])*S[i,j] - death_hum*S[i,j]  + 
+deriv(S[2:n_age,1:n_sero ]) <- alpha*C[i,j] -  (sum(foi_mos[]) - foi_mos[j])*S[i,j] - death_hum*S[i,j] + 
   age_rate[i-1]*S[i-1,j] - age_rate[i]*S[i,j] 
 
 # secondary infection
-deriv(I_ij[1,1:n_sero]) <- rho_2[i]*foi_mos[j]*(S_sec[i] - S[i,j]) - (gamma_2+xi_2+death_hum)*I_ij[i,j] - 
+deriv(I_ij[1,1:n_sero]) <- foi_mos[j]*(S_sec[i] - S[i,j]) - (gamma_2+death_hum)*I_ij[i,j] - 
   age_rate[i]*I_ij[i,j]
 
-deriv(I_ij[2:n_age,1:n_sero]) <- rho_2[i]*foi_mos[j]*(S_sec[i] - S[i,j]) - (gamma_2+xi_2+death_hum)*I_ij[i,j] + 
+deriv(I_ij[2:n_age,1:n_sero]) <- foi_mos[j]*(S_sec[i] - S[i,j]) - (gamma_2+death_hum)*I_ij[i,j] + 
   age_rate[i-1]*I_ij[i-1,j] - age_rate[i]*I_ij[i,j]
 
 
-deriv(A_ij[1,1:n_sero])  <- (1-rho_2[i])*foi_mos[j]*(S_sec[i] - S[i,j]) - (gamma_2 + death_hum)*A_ij[i,j] - 
-  age_rate[i]*A_ij[i,j] 
-
-deriv(A_ij[2:n_age,1:n_sero])  <- (1-rho_2[i])*foi_mos[j]*(S_sec[i] - S[i,j]) - (gamma_2 + death_hum)*A_ij[i,j] + 
-  age_rate[i-1]*A_ij[i-1,j] - age_rate[i]*A_ij[i,j] 
-
-
-# hospitalized and recovered
-
-deriv(H[1]) <- xi_1*sum(I[i,]) + xi_2*sum(I_ij[i,]) - (gamma_2 + death_hum)*H[i] - 
-  age_rate[i]*H[i]
-
-deriv(H[2:n_age]) <- xi_1*sum(I[i,]) + xi_2*sum(I_ij[i,])  - (gamma_2 + death_hum)*H[i] + 
-  age_rate[i-1]*H[i-1] - age_rate[i]*H[i]
-
-deriv(R[1]) <-  gamma_2*sum(I_ij[i,]) + gamma_2*sum(A_ij[i,])+ gamma_2*H[i] - death_hum*R[i] - 
+deriv(R[1]) <-  gamma_2*sum(I_ij[i,]) - death_hum*R[i] - 
   age_rate[i]*R[i]
 
-deriv(R[2:n_age]) <-  gamma_2*sum(I_ij[i,]) + gamma_2*sum(A_ij[i,]) + gamma_2*H[i] - death_hum*R[i] + 
+deriv(R[2:n_age]) <-  gamma_2*sum(I_ij[i,])  - death_hum*R[i] + 
   age_rate[i-1]*R[i-1] - age_rate[i]*R[i] 
 
 # mosquito population
@@ -110,18 +90,25 @@ deriv(total_pop_age[2:n_age]) <- age_rate[i-1]*total_pop_age[i-1] - age_rate[i]*
 
 deriv(inc_symp[1:n_data_year, 1:n_age]) <- if (as.integer(t) >= lo[i] && as.integer(t) <= u[i] ) (age_symp_inf_pri[j] + age_symp_inf_sec[j]) else 0
 
-#(100000*((age_symp_inf_pri[j])/N_age[j]) + 100000*((age_symp_inf_sec[j])/N_age[j])) else 0
 
 anu_inc_symp[1:n_data_year, 1:n_age] <- if (as.integer(t) >= lo[i] && as.integer(t) <= u[i] ) inc_symp[i,j] else 0
 
 inc_symp_p_100k[1:n_age] <- (sum(anu_inc_symp[,i]))
 
+
+## for absolute cases
+# output(inc[1:n_data_age]) <- sum(inc_symp_p_100k[a_l[i]:a_u[i]]) 
+
+## for incidence per 100k
 output(inc[1:n_data_age]) <- 100000*sum(inc_symp_p_100k[a_l[i]:a_u[i]])/sum(N_age[a_l[i]:a_u[i]])
 
+
+
+### this is extra not required for the model fitting with incidence of annual cases per 100,000
+## but with cumulative one
 deriv(agg_inc_symp[1:n_age]) <- (age_symp_inf_pri[i] + age_symp_inf_sec[i]) 
 
 output(agg_inc[1:n_data_age]) <- 100000*sum(agg_inc_symp[a_l[i]:a_u[i]])/sum(N_age[a_l[i]:a_u[i]])
-
 
 
 output(mos_foi[]) <- foi_mos[i]
@@ -131,19 +118,12 @@ output(hum_foi[]) <- foi_hum[i]
 output(N_total_age[]) <- N_age[i]
 
 
-# deriv(cum_inc[1:5]) <- if (as.integer(t) >= lo[i] && as.integer(t) <= u[i] ) beta*S*I/N else 0
-# 
-# infection[1:5] <-  if (as.integer(t) >= lo[i] && as.integer(t) <= u[i] ) cum_inc[i] else 0
-# 
-# output(x) <- sum(infection[])
-
-
 ## Parameters
 
 ## time dependent
 lambda_hum <- lambda_hum_tt[as.integer(t)]  
 death_hum <-  death_hum_tt[as.integer(t)] 
-b <-  b_tt[as.integer(t)] 
+b <-  user()
 
 lo[] <- l_t[i]
 u[] <- u_t[i]
@@ -152,10 +132,6 @@ a_l[] <- a_lo[i]
 
 
 # parameters
-kai <- user()
-
-# rho_1[] <- 0.5*rho_2[i]   #user()
-# rho_2[] <- 2*rho_1[i] #user()
 
 ratio_p_s <- user()
 
@@ -171,15 +147,6 @@ rho_2[46:55] <- rho_2_a6
 rho_2[56:65] <- rho_2_a7
 rho_2[66:91] <- rho_2_a8
 
-# rho_2[1:5] <- rho_2_a1
-# rho_2[6:15] <- rho_2_a2
-# rho_2[16:25] <- rho_2_a3
-# rho_2[26:35] <- rho_2_a4
-# rho_2[36:45] <- rho_2_a5
-# rho_2[46:55] <- rho_2_a6
-# rho_2[56:65] <- rho_2_a7
-# rho_2[66:91] <- rho_2_a8
-
 
 rho_2_a1 <- user()
 rho_2_a2 <- user()
@@ -189,15 +156,7 @@ rho_2_a5 <- user()
 rho_2_a6 <- user()
 rho_2_a7 <- user()
 rho_2_a8 <- user()
-# 
-# rho_2_a1 <- user()
-# rho_2_a2 <- user()
-# rho_2_a3 <- user()
-# rho_2_a4 <- user()
-# rho_2_a5 <- user()
-# rho_2_a6 <- user()
-# rho_2_a7 <- user()
-# rho_2_a8 <- user()
+
 
 sigma_m <- user()
 
@@ -205,8 +164,7 @@ sigma_m <- user()
 alpha <- user()
 gamma_1 <- user()
 gamma_2 <- user()
-xi_1 <- user()
-xi_2 <- user()
+
 
 
 # demography related
@@ -215,18 +173,14 @@ death_mos <- user()
 
 
 # LIST OF USER DEFINED PARAMETERS
-
-# time dependent parameter
-tt[] <- user()
 lambda_hum_tt[] <- user()
 death_hum_tt[] <- user()
-b_tt[] <- user()
+# b_tt[] <- user()
 l_t[] <- user()
 u_t[] <- user()
 a_up[] <- user()
 a_lo[] <- user()
 n_data_year <- user()
-n_data_year1 <- user()
 n_data_age <- user()
 
 
@@ -245,12 +199,9 @@ age_rate[] <- user()
 # initial conditions
 S0_all[] <- user()
 I0[,] <- user()
-A0[,] <- user()
 C0[,] <- user()
 S0[,] <- user()
 I_ij0[,] <- user()
-A_ij0[,] <- user()
-H0[] <- user()
 R0[] <- user()
 S_m0 <- user()
 E_m0[] <- user()
@@ -265,13 +216,9 @@ agg_inc_symp0[] <- user()
 ## parse initial conditions
 initial(S_all[]) <- S0_all[i]
 initial(I[,]) <- I0[i,j]
-initial(A[,]) <- A0[i,j]
 initial(C[,]) <- C0[i,j]
 initial(S[,]) <- S0[i,j]
-
 initial(I_ij[,]) <- I_ij0[i,j]
-initial(A_ij[,]) <- A_ij0[i,j]
-initial(H[]) <- H0[i]
 initial(R[]) <- R0[i]
 initial(S_m) <- S_m0 
 initial(E_m[]) <- E_m0[i]
@@ -283,23 +230,14 @@ initial(agg_inc_symp[]) <- agg_inc_symp0[i]
 
 # DECLARE ALL THE DIMENSIONS OF VECTORS USED AS USER_DEFINED PARAMETERS
 
-# time dependent parameter for interpolation
-dim(tt) <- user()
-dim(b_tt) <- user()
-# dim(vac_rate_tt)<-user()
-
 # initial conditions
 dim(S0_all) <- n_age
 dim(I0) <- c(n_age, n_sero)
-dim(A0) <- c(n_age, n_sero)
+# dim(A0) <- c(n_age, n_sero)
 dim(C0) <- c(n_age, n_sero)
 dim(S0) <- c(n_age, n_sero)
 dim(I_ij0) <- c(n_age, n_sero)
-dim(A_ij0) <- c(n_age, n_sero)
-
-dim(H0) <- n_age
 dim(R0) <- n_age
-# dim(S_m0) <- 1
 dim(E_m0) <- n_sero
 dim(I_m0) <- n_sero
 dim(total_pop_age0) <- n_age
@@ -309,13 +247,11 @@ dim(agg_inc_symp0) <- n_age
 # state variables
 dim(S_all) <- n_age
 dim(I) <- c(n_age, n_sero)
-dim(A) <- c(n_age, n_sero)
 dim(C) <- c(n_age, n_sero)
 dim(S) <- c(n_age, n_sero)
 dim(I_ij) <- c(n_age, n_sero)
-dim(A_ij) <- c(n_age, n_sero)
 
-dim(H) <- n_age
+# dim(H) <- n_age
 dim(R) <- n_age
 dim(E_m) <- n_sero
 dim(I_m) <- n_sero
@@ -335,16 +271,14 @@ dim(rho_2) <- n_age
 
 dim(lambda_hum_tt) <- user() 
 dim(death_hum_tt) <- user() 
-dim(lo) <- n_data_year1
-dim(u) <- n_data_year1
+dim(lo) <- n_data_year
+dim(u) <- n_data_year
 dim(l_t) <- user()
 dim(u_t) <- user()
 dim(a_u) <- n_data_age
 dim(a_l) <- n_data_age
 dim(a_up) <- user()
 dim(a_lo) <- user()
-
-
 
 # extra 
 dim(infected_hum) <- n_sero

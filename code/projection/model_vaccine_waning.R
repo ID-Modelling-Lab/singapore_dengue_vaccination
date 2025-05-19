@@ -14,35 +14,158 @@ N_v_age[] <- sum(S_v_all[, i]) + sum(I_v[, i, ])  + sum(C_v[, i, ]) + sum(S_v[, 
 # total non-vaccinated: age-stratified
 N_nv_age[] <-  S_all[i] + sum(I[i,])  + sum(C[i,]) + sum(S[i,]) + sum(I_ij[i,]) + R[i]
 
-## eligible for vaccination: age-stratified
+
 elig_vac_age[] <- S_all[i] + sum(C[i,]) + sum(S[i,]) + R[i]
 
 
+
+
 ## calculate the number of vaccinated for different compartments and introduce vaccination timing
-vac_Sall[1] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S_all[i]/elig_vac_age[i] else
+vac_Sall_scrng[1] <- if (as.integer(t) == vac_start) (1 - test_specifi)*vac_switch[i]*vac_coverage*N_age[i]*S_all[i]/elig_vac_age[i] else
   vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(S_all[i]/elig_vac_age[i])
 
-vac_Sall[2:n_age] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S_all[i]/elig_vac_age[i] else
+vac_Sall_scrng[2:n_age] <- if (as.integer(t) == vac_start) (1 - test_specifi)*vac_switch[i]*vac_coverage*N_age[i]*S_all[i]/elig_vac_age[i] else
   vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(S_all[i]/elig_vac_age[i])
 
-vac_C[1,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*C[i,j]/elig_vac_age[i] else
-  vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(C[i,j]/elig_vac_age[i])
+vac_C_scrng[1,1:n_sero] <- if (as.integer(t) == vac_start) (test_sensiti)*vac_switch[i]*vac_coverage*N_age[i]*C[i,j]/elig_vac_age[i] else
+  (test_sensiti)*vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(C[i,j]/elig_vac_age[i])
 
-vac_C[2:n_age,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*C[i,j]/elig_vac_age[i] else
+vac_C_scrng[2:n_age,1:n_sero] <- if (as.integer(t) == vac_start) (test_sensiti)*vac_switch[i]*vac_coverage*N_age[i]*C[i,j]/elig_vac_age[i] else
   vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(C[i,j]/elig_vac_age[i])
 
-vac_S[1,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S[i,j]/elig_vac_age[i] else
+vac_S_scrng[1,1:n_sero] <- if (as.integer(t) == vac_start) (test_sensiti)*vac_switch[i]*vac_coverage*N_age[i]*S[i,j]/elig_vac_age[i] else
   vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(S[i,j]/elig_vac_age[i])
 
-vac_S[2:n_age,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S[i,j]/elig_vac_age[i] else
+vac_S_scrng[2:n_age,1:n_sero] <- if (as.integer(t) == vac_start) (test_sensiti)*vac_switch[i]*vac_coverage*N_age[i]*S[i,j]/elig_vac_age[i] else
   vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(S[i,j]/elig_vac_age[i])
 
-vac_R[1] <-  if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*R[i]/elig_vac_age[i] else
+vac_R_scrng[1] <-  if (as.integer(t) == vac_start) (test_sensiti)*vac_switch[i]*vac_coverage*N_age[i]*R[i]/elig_vac_age[i] else
   vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(R[i]/elig_vac_age[i])
 
-vac_R[2:n_age] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*R[i]/elig_vac_age[i] else
+vac_R_scrng[2:n_age] <- if (as.integer(t) == vac_start) (test_sensiti)*vac_switch[i]*vac_coverage*N_age[i]*R[i]/elig_vac_age[i] else
   vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(R[i]/elig_vac_age[i])
 
+
+########### without pre screening criteria
+## calculate the number of vaccinated for different compartments and introduce vaccination timing
+vac_Sall_no_scrng[1] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S_all[i]/elig_vac_age[i] else
+  vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(S_all[i]/elig_vac_age[i])
+
+vac_Sall_no_scrng[2:n_age] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S_all[i]/elig_vac_age[i] else
+  vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(S_all[i]/elig_vac_age[i])
+
+vac_C_no_scrng[1,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*C[i,j]/elig_vac_age[i] else
+  vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(C[i,j]/elig_vac_age[i])
+
+vac_C_no_scrng[2:n_age,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*C[i,j]/elig_vac_age[i] else
+  vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(C[i,j]/elig_vac_age[i])
+
+vac_S_no_scrng[1,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S[i,j]/elig_vac_age[i] else
+  vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(S[i,j]/elig_vac_age[i])
+
+vac_S_no_scrng[2:n_age,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S[i,j]/elig_vac_age[i] else
+  vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(S[i,j]/elig_vac_age[i])
+
+vac_R_no_scrng[1] <-  if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*R[i]/elig_vac_age[i] else
+  vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(R[i]/elig_vac_age[i])
+
+vac_R_no_scrng[2:n_age] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*R[i]/elig_vac_age[i] else
+  vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(R[i]/elig_vac_age[i])
+
+
+
+###### now switch based on the model run
+## calculate the number of vaccinated for different compartments and introduce vaccination timing
+vac_Sall[1] <- if (prescreening == 1) vac_Sall_scrng[i] else
+  vac_Sall_no_scrng[i]
+
+vac_Sall[2:n_age] <- if (prescreening == 1) vac_Sall_scrng[i] else
+  vac_Sall_no_scrng[i]
+
+vac_C[1,1:n_sero] <- if (prescreening == 1) vac_C_scrng[i,j] else
+  vac_C_no_scrng[i,j]
+
+vac_C[2:n_age,1:n_sero] <- if (prescreening == 1) vac_C_scrng[i,j] else
+  vac_C_no_scrng[i,j]
+
+vac_S[1,1:n_sero] <- if (prescreening == 1) vac_S_scrng[i,j] else
+  vac_S_no_scrng[i,j]
+
+vac_S[2:n_age,1:n_sero] <- if (prescreening == 1) vac_S_scrng[i,j] else
+  vac_S_no_scrng[i,j]
+
+vac_R[1] <-  if (prescreening == 1) vac_R_scrng[i] else
+  vac_R_no_scrng[i]
+
+vac_R[2:n_age] <- if (prescreening == 1) vac_R_scrng[i] else
+  vac_R_no_scrng[i]
+
+
+## test_sensitivity == sensitivity of test for dengue: for scenario o vaccinating only seropositive
+
+## number of vaccinated when there is a screening
+# vac_Sall_scrng[] <- if (as.integer(t) >= vac_start) (1/365)*(1 - test_specifi)*vac_switch[i]*test_coverage*S_all[i] else 0
+# 
+# vac_C_scrng[,] <- if (as.integer(t) >= vac_start) (1/365)*(test_sensiti)*vac_switch[i]*test_coverage*C[i,j] else 0
+# 
+# vac_S_scrng[,] <- if (as.integer(t) >= vac_start) (1/365)*(test_sensiti)*vac_switch[i]*test_coverage*S[i,j] else 0
+# 
+# vac_R_scrng[] <- if (as.integer(t) >= vac_start) (1/365)*(test_sensiti)*vac_switch[i]*test_coverage*R[i] else 0
+# 
+# 
+# vac_Sall_non_sero_scrng[] <- if (as.integer(t) >= vac_start) (1/365)*vac_switch[i]*test_coverage*S_all[i]*( ((1 - test_specifi)*S_all[i] + test_sensiti*(sum(C[i,]) + sum(S[i,]) + R[i]))/elig_vac_age[i] ) else 0
+# vac_C_non_sero_scrng[,] <- if (as.integer(t) >= vac_start) (1/365)*vac_switch[i]*test_coverage*C[i,j]*( ((1 - test_specifi)*S_all[i] + test_sensiti*(sum(C[i,]) + sum(S[i,]) + R[i]))/elig_vac_age[i] ) else 0
+# vac_S_non_sero_scrng[,] <- if (as.integer(t) >= vac_start) (1/365)*vac_switch[i]*test_coverage*S[i,j]*( ((1 - test_specifi)*S_all[i] + test_sensiti*(sum(C[i,]) + sum(S[i,]) + R[i]))/elig_vac_age[i] ) else 0
+# vac_R_non_sero_scrng[] <- if (as.integer(t) >= vac_start) (1/365)*vac_switch[i]*test_coverage*R[i]*( ((1 - test_specifi)*S_all[i] + test_sensiti*(sum(C[i,]) + sum(S[i,]) + R[i]))/elig_vac_age[i] ) else 0
+# 
+# ########### without pre screening criteria
+# ## calculate the number of vaccinated for different compartments and introduce vaccination timing
+# vac_Sall_no_scrng[1] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S_all[i]/elig_vac_age[i] else
+#   vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(S_all[i]/elig_vac_age[i])
+# 
+# vac_Sall_no_scrng[2:n_age] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S_all[i]/elig_vac_age[i] else
+#   vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(S_all[i]/elig_vac_age[i])
+# 
+# vac_C_no_scrng[1,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*C[i,j]/elig_vac_age[i] else
+#   vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(C[i,j]/elig_vac_age[i])
+# 
+# vac_C_no_scrng[2:n_age,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*C[i,j]/elig_vac_age[i] else
+#   vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(C[i,j]/elig_vac_age[i])
+# 
+# vac_S_no_scrng[1,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S[i,j]/elig_vac_age[i] else
+#   vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(S[i,j]/elig_vac_age[i])
+# 
+# vac_S_no_scrng[2:n_age,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S[i,j]/elig_vac_age[i] else
+#   vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(S[i,j]/elig_vac_age[i])
+# 
+# vac_R_no_scrng[1] <-  if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*R[i]/elig_vac_age[i] else
+#   vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(R[i]/elig_vac_age[i])
+# 
+# vac_R_no_scrng[2:n_age] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*R[i]/elig_vac_age[i] else
+#   vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(R[i]/elig_vac_age[i])
+# 
+# 
+# ###### now switch based on the model run
+# ## calculate the number of vaccinated for different compartments and introduce vaccination timing
+# vac_Sall[] <- if (prescreening == 1 && prescreening_non_sero == 0) vac_Sall_scrng[i] else
+#   if (prescreening == 1 && prescreening_non_sero == 1) vac_Sall_non_sero_scrng[i] else 
+#     if (prescreening == 0) vac_Sall_no_scrng[i] else 0
+# 
+# vac_C[,] <- if (prescreening == 1 && prescreening_non_sero == 0) vac_C_scrng[i,j] else
+#   if (prescreening == 1 && prescreening_non_sero == 1) vac_C_non_sero_scrng[i,j] else 
+#     if (prescreening == 0) vac_C_no_scrng[i,j] else 0
+# 
+# vac_S[,] <- if (prescreening == 1 && prescreening_non_sero == 0) vac_S_scrng[i,j] else
+#   if (prescreening == 1 && prescreening_non_sero == 1) vac_S_non_sero_scrng[i,j] else 
+#     if (prescreening == 0) vac_S_no_scrng[i,j] else 0
+# 
+# vac_R[] <- if (prescreening == 1 && prescreening_non_sero == 0) vac_R_scrng[i] else
+#   if (prescreening == 1 && prescreening_non_sero == 1) vac_R_non_sero_scrng[i] else 
+#     if (prescreening == 0) vac_R_no_scrng[i] else 0
+
+
+#### importation
+import[1:n_sero] <- if (as.integer(t) >= import_start && as.integer(t) <= import_end) n_import else 0
 
 # force of infection from infected mosquitoes 
 foi_mos[] <- b*beta_m[i]*I_m[i]/N 
@@ -104,7 +227,7 @@ deriv(S_m) <- lambda_mos*(S_m + sum(E_m[]) + sum(I_m[])) - S_m*sum(foi_hum[]) - 
 
 deriv(E_m[1:n_sero]) <-  S_m*foi_hum[i] - (sigma_m + death_mos)*E_m[i]
 
-deriv(I_m[1:n_sero]) <- sigma_m*E_m[i] - death_mos*I_m[i]
+deriv(I_m[1:n_sero]) <- import_switch[i]*import[i] + sigma_m*E_m[i] - death_mos*I_m[i]
 
 # vaccinated population
 ## i- stages of vaccinated population (different estimates of VE from trial data in diff time points)
@@ -228,7 +351,6 @@ deriv(S_v[2:n_vac_stage,2:n_age,1:n_sero ]) <- alpha*C_v[i,j,k] -
 ## for secondary infection (vaccinated)
 S_sec_v[,] <- sum(S_v[i,j,])
 
-# S_v[i,j,1] + S_v[i,j,2] + S_v[i,j,3] + S_v[i,j,4]
 
 deriv(I_v_ij[1,1,1:n_sero]) <- foi_mos[k]*(1 - effi_inf_sero_p[i])*(S_sec_v[i,j]- S_v[i,j,k]) -
   (gamma_2 + death_hum)*I_v_ij[i,j,k] - 
@@ -325,22 +447,44 @@ output(tot_nonvac_age[]) <- N_nv_age[i]
 
 ##incidence of infection
 output(inc_inf[,]) <- inc_inf_pri[i,j] + inc_inf_sec[i,j]
-# incidence of infection 
+# # incidence of infection 
 output(inc_inf_v[,]) <- inc_inf_v_pri[i,j] + inc_inf_v_sec[i,j]
 
 ## incidence of symptomatic
 output(inc_symp[,]) <- rho_1[i]*inc_inf_pri[i,j] + rho_2[i]*inc_inf_sec[i,j]
-# incidence of symptomatic 
+# # incidence of symptomatic 
 output(inc_symp_v[,]) <- rho_1[i]*inc_symp_v_pri[i,j] + rho_2[i]*inc_symp_v_sec[i,j]
 
-## incidence of hospitalized
-output(inc_hosp[]) <- xi_1*rho_1[i]*sum(inc_inf_pri[i,]) + xi_2*rho_2[i]*sum(inc_inf_sec[i,])
-# incidence of hospitalization
-output(inc_hosp_v[]) <- xi_1*rho_1[i]*sum(inc_hosp_v_pri[i,]) + xi_2*rho_2[i]*sum(inc_hosp_v_sec[i,])
 
+## incidence of hospitalized
+output(inc_hosp[]) <- xi_1[i]*rho_1[i]*sum(inc_inf_pri[i,]) + xi_2[i]*rho_2[i]*sum(inc_inf_sec[i,])
+# # incidence of hospitalization
+output(inc_hosp_v[]) <- xi_1[i]*rho_1[i]*sum(inc_hosp_v_pri[i,]) + xi_2[i]*rho_2[i]*sum(inc_hosp_v_sec[i,])
 
 ##
-output(new_vac_age[]) <- vac_switch[i]*(vac_Sall[i] + sum(vac_C[i,]) + sum(vac_S[i,]) + vac_R[i]) 
+output(new_vac_age[]) <- vac_switch[i]*(vac_Sall[i] + sum(vac_C[i,]) + sum(vac_S[i,]) + vac_R[i])
+
+
+
+## primary secondary stratified
+output(inc_inf_primary[,]) <- inc_inf_pri[i,j]
+output(inc_inf_secondary[,]) <- inc_inf_sec[i,j]
+# incidence of infection
+output(inc_inf_v_primary[,]) <- inc_inf_v_pri[i,j]
+output(inc_inf_v_secondary[,]) <- inc_inf_v_sec[i,j]
+output(inc_symp_primary[,]) <- rho_1[i]*inc_inf_pri[i,j]
+output(inc_symp_secondary[,]) <- rho_2[i]*inc_inf_sec[i,j]
+# incidence of symptomatic
+output(inc_symp_v_primary[,]) <- rho_1[i]*inc_symp_v_pri[i,j]
+output(inc_symp_v_secondary[,]) <- rho_2[i]*inc_symp_v_sec[i,j]
+output(inc_hosp_primary[]) <- xi_1[i]*rho_1[i]*sum(inc_inf_pri[i,])
+output(inc_hosp_secondary[]) <- xi_2[i]*rho_2[i]*sum(inc_inf_sec[i,])
+# incidence of hospitalization
+output(inc_hosp_v_primary[]) <- xi_1[i]*rho_1[i]*sum(inc_hosp_v_pri[i,])
+output(inc_hosp_v_secondary[]) <-  xi_2[i]*rho_2[i]*sum(inc_hosp_v_sec[i,])
+output(new_vac_age_primary[]) <- vac_switch[i]*(vac_Sall[i] )
+output(new_vac_age_secondary[]) <- vac_switch[i]*(sum(vac_C[i,]) + sum(vac_S[i,]) + vac_R[i])
+
 
 
 ## Parameters
@@ -357,14 +501,27 @@ death_hum_tt[] <- user()
 dim(lambda_hum_tt) <- user()
 dim(death_hum_tt) <- user()
 
+
+## importation
+import_switch[] <- user()
+dim(import_switch) <- n_sero
+dim(import) <- n_sero
+n_import <- user()
+import_start <- user()
+import_end <- user()
+
+
 ## fixed parameters
 # scalar valued
+prescreening <- user()
+# prescreening_non_sero <- user()
+test_sensiti <- user()
+test_specifi <- user()
+# test_coverage <- user()
 b <- user()
 alpha <- user()
 gamma_1 <- user()
 gamma_2 <- user()
-xi_1 <- user()
-xi_2 <- user()
 # kai <- user()
 n_age <- user() 
 n_sero <- user() 
@@ -378,6 +535,8 @@ rho_2[] <- user()
 beta_m[] <- user()
 beta_h[] <- user()  
 age_rate[] <- user()
+xi_1[] <- user()
+xi_2[] <- user()
 
 #dims
 dim(rho_1) <- n_age
@@ -385,6 +544,8 @@ dim(rho_2) <- n_age
 dim(beta_m) <- n_sero
 dim(beta_h) <- n_sero
 dim(age_rate) <- n_age
+dim(xi_1) <- n_age
+dim(xi_2) <- n_age
 
 # vaccine efficacy
 vac_switch[] <- user()
@@ -476,7 +637,25 @@ dim(I_v_ij) <- c(n_vac_stage,n_age, n_sero)
 dim(R_v) <-  c(n_vac_stage, n_age)
 
 # extra quantities
-## EXTRA FOR OUTPUTS 
+## primary secondary stratified
+dim(inc_inf_primary) <- c(n_age,n_sero)
+dim(inc_inf_secondary) <- c(n_age,n_sero)
+dim(inc_inf_v_primary) <- c(n_age, n_sero)
+dim(inc_inf_v_secondary) <- c(n_age, n_sero)
+dim(inc_symp_primary) <- c(n_age,n_sero)
+dim(inc_symp_secondary) <- c(n_age,n_sero)
+dim(inc_symp_v_primary) <- c(n_age, n_sero)
+dim(inc_symp_v_secondary) <- c(n_age, n_sero)
+dim(inc_hosp_primary) <- n_age
+dim(inc_hosp_secondary) <- n_age
+dim(inc_hosp_v_primary) <- n_age
+dim(inc_hosp_v_secondary) <- n_age
+dim(new_vac_age_primary) <- n_age
+dim(new_vac_age_secondary) <- n_age
+
+## EXTRA FOR OUTPUTS
+
+
 dim(inc_inf_pri) <- c(n_age, n_sero)
 dim(inc_inf_sec) <- c(n_age, n_sero)
 dim(inc_inf_v_pri) <- c(n_age, n_sero)
@@ -485,8 +664,6 @@ dim(inc_symp_v_pri) <- c(n_age, n_sero)
 dim(inc_symp_v_sec) <- c(n_age, n_sero)
 dim(inc_hosp_v_pri) <- c(n_age, n_sero)
 dim(inc_hosp_v_sec) <- c(n_age, n_sero)
-# dim(inc_hosp_pri) <- c(n_age, n_sero)
-# dim(inc_hosp_sec) <- c(n_age, n_sero)
 dim(inf_v_pri_vac_stage) <- c(n_vac_stage,n_age, n_sero)
 dim(inf_v_sec_vac_stage) <- c(n_vac_stage,n_age, n_sero)
 dim(symp_v_pri_vac_stage) <- c(n_vac_stage,n_age, n_sero)
@@ -510,13 +687,34 @@ dim(vac_S) <- c(n_age, n_sero)
 dim(vac_R) <- n_age
 dim(vac_stage_rate) <- n_vac_stage
 
-## for output
+## for prescreeening
+dim(vac_Sall_scrng) <- n_age
+dim(vac_C_scrng) <- c(n_age, n_sero)
+dim(vac_S_scrng) <- c(n_age, n_sero)
+dim(vac_R_scrng) <- n_age
+
+
+## for without prescreening
+dim(vac_Sall_no_scrng) <- n_age
+dim(vac_C_no_scrng) <- c(n_age, n_sero)
+dim(vac_S_no_scrng) <- c(n_age, n_sero)
+dim(vac_R_no_scrng) <- n_age
+
+## for prescreening but baseline
+# dim(vac_Sall_non_sero_scrng) <- n_age
+# dim(vac_C_non_sero_scrng) <- c(n_age, n_sero)
+# dim(vac_S_non_sero_scrng) <- c(n_age, n_sero)
+# dim(vac_R_non_sero_scrng) <- n_age
+
+
+
 dim(inc_inf) <- c(n_age,n_sero)
 dim(inc_inf_v) <- c(n_age, n_sero)
 dim(inc_symp) <- c(n_age,n_sero)
 dim(inc_symp_v) <- c(n_age, n_sero)
 dim(inc_hosp) <- n_age
 dim(inc_hosp_v) <- n_age
+
 dim(tot_age) <- n_age
 dim(tot_vac_age) <- n_age
 dim(tot_nonvac_age) <- n_age

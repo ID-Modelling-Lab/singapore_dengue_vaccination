@@ -1,15 +1,30 @@
-#!/bin/bash 
-#PBS -P Proj_test 
-#PBS -q serial 
-#PBS -l select=1:ncpus=1
+#!/bin/bash
+#PBS -P Proj_dengue_indo
+#PBS -q parallel
+#PBS -l select=1:ncpus=12:mem=45gb
+#PBS -l walltime=30:00:00
 #PBS -j oe
-#PBS -N hpc_test
+#PBS -N hpc_dengue_indo
 cd $PBS_O_WORKDIR
 source /app1/ebenv
 
 module load R/4.3.2-gfbf-2023a
 
+# Define the parameter values
+#params=(0.05 0.10 0.15 0.20 0.25)
 
-Rscript ./run_vac_projection.R &> ./output.txt
+# Loop through each parameter value
+#for param in "${params[@]}"
+#do
+ #   echo "Running R script with parameter: $param"
+  #  Rscript ./projection/run_vac_projection_working.R "$param" &> ./output_$param.txt
+#done
+
+
+#exit $?
+
+Rscript ./projection/run_vac_projection_indonesia.R yes 0.8 &> ./output.txt
+
 
 exit $?
+

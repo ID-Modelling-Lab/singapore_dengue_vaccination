@@ -43,6 +43,8 @@ vac_R[1] <-  if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]
 vac_R[2:n_age] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*R[i]/elig_vac_age[i] else
   vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(R[i]/elig_vac_age[i])
 
+####
+import[1:n_sero] <- if (as.integer(t) >= import_start && as.integer(t) <= import_end) n_import else 0
 
 # force of infection from infected mosquitoes 
 foi_mos[] <- b*beta_m[i]*I_m[i]/N 
@@ -104,7 +106,7 @@ deriv(S_m) <- lambda_mos*(S_m + sum(E_m[]) + sum(I_m[])) - S_m*sum(foi_hum[]) - 
 
 deriv(E_m[1:n_sero]) <-  S_m*foi_hum[i] - (sigma_m + death_mos)*E_m[i]
 
-deriv(I_m[1:n_sero]) <- sigma_m*E_m[i] - death_mos*I_m[i]
+deriv(I_m[1:n_sero]) <- import_switch[i]*import[i] + sigma_m*E_m[i] - death_mos*I_m[i]
 
 # vaccinated population
 ## i- stages of vaccinated population (different estimates of VE from trial data in diff time points)
@@ -325,22 +327,49 @@ output(tot_nonvac_age[]) <- N_nv_age[i]
 
 ##incidence of infection
 output(inc_inf[,]) <- inc_inf_pri[i,j] + inc_inf_sec[i,j]
-# incidence of infection 
+# # incidence of infection 
 output(inc_inf_v[,]) <- inc_inf_v_pri[i,j] + inc_inf_v_sec[i,j]
+
+# output(inc_inf_primary[,]) <- inc_inf_pri[i,j] 
+# output(inc_inf_secondary[,]) <- inc_inf_sec[i,j]
+# # incidence of infection 
+# output(inc_inf_v_primary[,]) <- inc_inf_v_pri[i,j] 
+# output(inc_inf_v_secondary[,]) <- inc_inf_v_sec[i,j]
 
 ## incidence of symptomatic
 output(inc_symp[,]) <- rho_1[i]*inc_inf_pri[i,j] + rho_2[i]*inc_inf_sec[i,j]
-# incidence of symptomatic 
+# # incidence of symptomatic 
 output(inc_symp_v[,]) <- rho_1[i]*inc_symp_v_pri[i,j] + rho_2[i]*inc_symp_v_sec[i,j]
+
+
+
+# output(inc_symp_primary[,]) <- rho_1[i]*inc_inf_pri[i,j] 
+# output(inc_symp_secondary[,]) <- rho_2[i]*inc_inf_sec[i,j]
+
+
+# incidence of symptomatic 
+# output(inc_symp_v_primary[,]) <- rho_1[i]*inc_symp_v_pri[i,j] 
+# output(inc_symp_v_secondary[,]) <- rho_2[i]*inc_symp_v_sec[i,j]
+
 
 ## incidence of hospitalized
 output(inc_hosp[]) <- xi_1*rho_1[i]*sum(inc_inf_pri[i,]) + xi_2*rho_2[i]*sum(inc_inf_sec[i,])
-# incidence of hospitalization
+# # incidence of hospitalization
 output(inc_hosp_v[]) <- xi_1*rho_1[i]*sum(inc_hosp_v_pri[i,]) + xi_2*rho_2[i]*sum(inc_hosp_v_sec[i,])
 
 
+# output(inc_hosp_primary[]) <- xi_1*rho_1[i]*sum(inc_inf_pri[i,]) 
+# output(inc_hosp_secondary[]) <- xi_2*rho_2[i]*sum(inc_inf_sec[i,])
+# incidence of hospitalization
+# output(inc_hosp_v_primary[]) <- xi_1*rho_1[i]*sum(inc_hosp_v_pri[i,]) 
+# output(inc_hosp_v_secondary[]) <-  xi_2*rho_2[i]*sum(inc_hosp_v_sec[i,])
+
+
 ##
-output(new_vac_age[]) <- vac_switch[i]*(vac_Sall[i] + sum(vac_C[i,]) + sum(vac_S[i,]) + vac_R[i]) 
+output(new_vac_age[]) <- vac_switch[i]*(vac_Sall[i] + sum(vac_C[i,]) + sum(vac_S[i,]) + vac_R[i])
+
+# output(new_vac_age_primary[]) <- vac_switch[i]*(vac_Sall[i] ) 
+# output(new_vac_age_secondary[]) <- vac_switch[i]*(sum(vac_C[i,]) + sum(vac_S[i,]) + vac_R[i])
 
 
 ## Parameters
@@ -353,9 +382,19 @@ death_hum <-  death_hum_tt[as.integer(t)]
 lambda_hum_tt[] <- user()
 death_hum_tt[] <- user()
 
+
 # define the corresponding dimensions 
 dim(lambda_hum_tt) <- user()
 dim(death_hum_tt) <- user()
+
+## importation
+import_switch[] <- user()
+dim(import_switch) <- n_sero
+dim(import) <- n_sero
+n_import <- user()
+import_start <- user()
+import_end <- user()
+
 
 ## fixed parameters
 # scalar valued
@@ -511,13 +550,38 @@ dim(vac_R) <- n_age
 dim(vac_stage_rate) <- n_vac_stage
 
 ## for output
+# dim(inc_inf) <- c(n_age,n_sero)
+# dim(inc_inf_v) <- c(n_age, n_sero)
+# dim(inc_symp) <- c(n_age,n_sero)
+# dim(inc_symp_v) <- c(n_age, n_sero)
+# dim(inc_hosp) <- n_age
+# dim(inc_hosp_v) <- n_age
+
+
+
+# dim(inc_inf_primary) <- c(n_age,n_sero)
+# dim(inc_inf_secondary) <- c(n_age,n_sero)
+# dim(inc_inf_v_primary) <- c(n_age, n_sero)
+# dim(inc_inf_v_secondary) <- c(n_age, n_sero)
+# dim(inc_symp_primary) <- c(n_age,n_sero)
+# dim(inc_symp_secondary) <- c(n_age,n_sero)
+# dim(inc_symp_v_primary) <- c(n_age, n_sero)
+# dim(inc_symp_v_secondary) <- c(n_age, n_sero)
+# dim(inc_hosp_primary) <- n_age
+# dim(inc_hosp_secondary) <- n_age
+# dim(inc_hosp_v_primary) <- n_age
+# dim(inc_hosp_v_secondary) <- n_age
+
 dim(inc_inf) <- c(n_age,n_sero)
 dim(inc_inf_v) <- c(n_age, n_sero)
 dim(inc_symp) <- c(n_age,n_sero)
 dim(inc_symp_v) <- c(n_age, n_sero)
 dim(inc_hosp) <- n_age
 dim(inc_hosp_v) <- n_age
+
 dim(tot_age) <- n_age
 dim(tot_vac_age) <- n_age
 dim(tot_nonvac_age) <- n_age
 dim(new_vac_age) <- n_age
+# dim(new_vac_age_primary) <- n_age
+# dim(new_vac_age_secondary) <- n_age

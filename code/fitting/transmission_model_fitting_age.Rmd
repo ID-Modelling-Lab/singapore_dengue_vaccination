@@ -18,18 +18,21 @@ library(mcstate)
 library(odin.dust)
 library(readxl)
 library(ggplot2)
+library(here)
 # library(ggpubr)
 library(dplyr)
 # library(imputeTS)
- # library(latex2exp)
-# library(ggpubr)
+ library(latex2exp)
+library(ggpubr)
 ```
 
 ```{r}
 rm(list=ls(all=TRUE)) ### will remove everything from workspace
 gc(reset=TRUE)        ### collects garbage memory
 
-source("~/codes/dengue_main/test/utils.R")
+## cal all the functions from utils
+source(here("utils","utils_demography.R"))
+source(here("utils","utils_sero_prevalence.R"))
 ```
 
 ### Demographic Information
@@ -38,9 +41,6 @@ source("~/codes/dengue_main/test/utils.R")
 #### Population in each age group
 
 ```{r }
-## Total number of population in each age-group (Only Singapore Residents (Citizen+PR))
-pop_data = read_xlsx("~/codes/dengue_main/data/singapore_population_data.xlsx", sheet="T3")
-
 ## Specify the beginning and and end year for demographic information from the data (singstat.gov.sg)
 begin_year = "2013"
 end_year = "2021"
@@ -52,27 +52,8 @@ extra_year <- 0
 
 sim_year <- n_year + extra_year
 
-## create array of time in day (required for solving ode)
-# t <- seq(0,(sim_year*365), by=1)
-
-### For fitting with aggregated incidence data
-# data_reported_yearly = read_xlsx("~/codes/dengue_main/data/serotype_share_age_cases.xlsx",
-#                          sheet="yearly_reported_cases")
-# 
-# reported_cases_data <- data_reported_yearly[data_reported_yearly$year %in% 2013:2021,]
-# 
-# reported_cases=reported_cases_data %>%
-#     select(year, cases_p_100k) %>%
-#     mutate(
-#       day=c(1,365*(1:(length(reported_cases_data$year)-1)))
-#       # day=c(365*(1:(length(reported_cases_data$year))))
-#     ) 
-
-
-## for fitting with age-specific annual incidence data
-# 
-data_reported_age_yearly = read_xlsx("~/codes/dengue_main/data/serotype_share_age_cases.xlsx",
-                         sheet="age_case_2014_20")
+## read the reported incidence data (yearly)
+data_reported_age_yearly = read_xlsx(here("data","serotype_share_age_cases.xlsx" ), sheet="age_case_2014_20")
 
 # select the incidence per 100k data
 df_age_rep_inc <- select(data_reported_age_yearly, year,contains("_inc_") )
@@ -83,44 +64,16 @@ reported_cases=df_age_rep_inc %>%
       day=c(365*(1:(length(df_age_rep_inc$year))))
     )
 
+## absolute cases data
 
-
-## for fitting with age-specific aggregated (average) annual incidence data
-
-# data_reported_age_agg = read_xlsx("~/codes/dengue_main/data/serotype_share_age_cases.xlsx",
-#                          sheet="avg_age_inc_2014_20")
+# df_age_rep_inc <- select(data_reported_age_yearly, year,!contains("_inc_") )
 # 
-# # select the incidence per 100k data
-# df_age_rep_inc_agg <- select(data_reported_age_agg, year,contains("_inc_") )
-# 
-# reported_cases=df_age_rep_inc_agg %>%
+# reported_cases=df_age_rep_inc %>%
 #     mutate(
 #       # day=c(1,365*(1:(length(df_age_rep_inc$year)-1)))
-#       day=2555
+#       day=c(365*(1:(length(df_age_rep_inc$year))))
 #     )
 
-
-
-
-##########
-### for fitting
-
- # t <- as.numeric(1:(365*(length(reported_cases_data$year)-1))+1)
-
-t <- as.numeric(1:3921)
-
-
-## get the population data for n_year
-pop_data_final <- get_processed_population_data(pop_data = pop_data,
-                                                begin_year = begin_year,
-                                                end_year = end_year)
-
-## Initial population in each age group
-pop_each_age_group <- as.numeric(unlist(pop_data_final[-1,
-                       which(names(pop_data_final) %in% c(begin_year))]))
-
-## Number of age group
-n_age <-length(pop_each_age_group) 
 
 ## Number of serotype
 n_sero <- 4
@@ -129,133 +82,43 @@ n_sero <- 4
 #### Crude birth rate over time
 
 ```{r}
-## Read birth rate data from sgstat.gov.sg
-birth_rate_data = read_xlsx("~/codes/dengue_main/data/singapore_population_data.xlsx",
-                           sheet = "birth_rate_per_1k")
-
-## historical birth death data from WPP
-birth_rate_WPP = read_xlsx("~/codes/dengue_main/data/singapore_population_data.xlsx",
-                           sheet = "birth_death_WPP")
-
-## projection of birth rate data from (World population prospects) WPP
-## Link: https://population.un.org/wpp/Graphs/DemographicProfiles/Line/702
-
-birth_rate_projection = read_xlsx("~/codes/dengue_main/data/singapore_population_data.xlsx",
-                           sheet = "birth_death_projection_medium")
 
 
-### 3. beginning with sgstat.gov.sg and the then projection from WPP
-
-lambda_hum_proj1 <- birth_rate_projection[,which(names(birth_rate_projection) == "Crude Birth Rate (births per 1,000 population)" )]
-
-lambda_hum1 <- birth_rate_data[(birth_rate_data$Data_Series %in%
-                                       "Crude Birth Rate (Per Thousand Residents)"),
-                              which(names(birth_rate_data) %in% begin_year:end_year)]
-
-lambda_hum <- c(as.numeric(unlist(rev(lambda_hum1))), as.numeric(unlist(lambda_hum_proj1))[2:length(as.numeric(unlist(lambda_hum_proj1)))] )
-
-## make it per day per 1k (time dependent)
-# lambda_hum_tt <- (1/(365*1000))*rep(lambda_hum[1:(min(length(lambda_hum),sim_year))], each=365)
-
-lambda_hum_tt <- (1/(365*1000))*(c(lambda_hum[1],rep(lambda_hum[2:(min(length(lambda_hum),sim_year))], each = 365)))
+## population in each age group in "begin_year"
+pop_each_age_group <- get_pop_each_group(begin_year = begin_year,
+                                         end_year = end_year )
 
 
-  
-## for extra year for which the data is not available from WPP
-## we take the last value from the data and simulate forward
-# ##  Birth rate
- 
-if (length(lambda_hum_tt) < length(t)){
-  lambda_hum_tt = c(lambda_hum_tt,
-                    rep(lambda_hum_tt[length(lambda_hum_tt)],
-                        (length(t)- length(lambda_hum_tt)))
-  )
-}
+## Number of age group
+n_age <- length(pop_each_age_group) 
+
+## birth rate over time
+lambda_hum_tt = get_birth_rate(begin_year = begin_year, 
+                               end_year = end_year, 
+                               sim_year = sim_year)
+
+## death rate over time
+death_hum_tt = get_death_rate(begin_year = begin_year, 
+                              end_year = end_year, 
+                              sim_year = sim_year)
+
+
+# for sero-prevalence data
+sero_year = 2013
+## sero-prevalence data
+get_sero <- get_sero_p(sero_year = sero_year )
+
+## sero-positive fraction i.e at least one exposure
+sero_p <- get_sero$se_p
+## exactly one exposure
+primary <- get_sero$pri
+
+
+
 ```
 
 #### Age-specific mortality data over time
 
-```{r}
-age_mort_data = read_xlsx("~/codes/dengue_main/data/singapore_population_data.xlsx",
-                         sheet="age_specific_death_rate_per_1k")
-
-## historical birth death data from WPP
-death_rate_WPP = read_xlsx("~/codes/dengue_main/data/singapore_population_data.xlsx",
-                           sheet="birth_death_WPP")
-
-## Projection from WPP
-death_rate_projection = read_xlsx("~/codes/dengue_main/data/singapore_population_data.xlsx",
-                           sheet="birth_death_projection_medium")
-
-
-
-
-### 3. Beginning with sgstat.gov.sg and the then projection from WPP
-
-total_death_rate <- age_mort_data[age_mort_data$Data_Series==
-                  "Total Age Specific Death Rate",
-                  -which(names(age_mort_data) %in% c("Data_Series"))]
-
-death_hum1 <- select(total_death_rate,  begin_year:end_year)
-
-death_hum_proj1 <- death_rate_projection[,which(names(death_rate_projection) == "Crude Death Rate (deaths per 1,000 population)" )]
-
-
-death_hum <- c(as.numeric(unlist(death_hum1)), as.numeric(unlist(death_hum_proj1))[2:length(as.numeric(unlist(death_hum_proj1)))] )
-
-# death_hum_age <- array(rep(death_hum,each= n_age), dim = c(n_age,length(death_hum)) )
-
- ## make it daily
-# death_hum_tt <- (1/(365*1000))*(apply(death_hum_age[,1:(min(length(death_hum),sim_year))], 1,
-#                                               function(x) rep(x,each=365)))
-
-
-# death_hum_tt <- (1/(365*1000))*(rbind(death_hum_age[,1] ,apply(death_hum_age[,2:(min(length(death_hum),sim_year))], 1,
-#                                               function(x) rep(x,each=365))))
-
-death_hum_tt <- (1/(365*1000))*(c(death_hum[1],rep(death_hum[2:(min(length(death_hum),sim_year))], each=365)))
-
-
-##################################################################################
-
-######### for missing info of death rate takes the last data point and continue #############
-    ## death rate
-    # if (dim(death_hum_tt)[1] < length(t)){
-    #           death_hum_tt = rbind(death_hum_tt, 
-    #                            matrix( rep(death_hum_tt[dim(death_hum_tt)[1],],
-    #                             (length(t)- dim(death_hum_tt)[1])), ncol=n_age)
-    #                             )
-    #                             }
-
- 
-if (length(death_hum_tt) < length(t)){
-  death_hum_tt = c(death_hum_tt,
-                    rep(death_hum_tt[length(death_hum_tt)],
-                        (length(t)- length(death_hum_tt)))
-  )
-}
-```
-
-#### Sero-prevalence data (Reconstruction of sero-prevalence using catalytic model)
-
-```{r}
-# Read the data
-data_sero <- read_xlsx("~/codes/dengue_main/data/dengue_sero_prevalence_singapore.xlsx", sheet="dengue_sero_p_2013_17")
-
-## select the sero_prevalence data
-sero_year = 2013
-
-#### age that we are modelling i.e 0-89y and 90+y
-age = 0:90
-
-seroprevalence <- get_seroprevalence(data_sero = data_sero, sero_year = sero_year, age=age)
-
-sero_p <- seroprevalence[1,]
-sero_n <- seroprevalence[2,]
-primary <- seroprevalence[3,]
-secondary <- seroprevalence[4,]
-
-```
 
 ##### Demographic
 
@@ -275,29 +138,21 @@ secondary <- seroprevalence[4,]
 ###### Initial conditions
 
 ```{r eval=TRUE}
-
-
-
 data_year <- reported_cases$day
-l_t <- c(1,data_year[-length(data_year)])  #data_year[-length(data_year)]  #c(1,data_year[-length(data_year)]) #data_year[-length(data_year)] #
-u_t <- c(data_year)  #data_year[-1]    ##c(1,data_year[-1])   #data_year[-1] #c(data_year)
 
+## upper and lower bound bound of "years" in the data
+l_t <- c(1,data_year[-length(data_year)])   
+u_t <- c(data_year)   
 
-a_lo <-   c(1, 6, 16, 26, 36, 46, 56, 66)  #c(1,5,6,15,16,25,26,35,36,45,46,55,56,65,66,91) 
+## upper and lower bounds of age
+a_lo <-   c(1, 6, 16, 26, 36, 46, 56, 66) 
 a_up <-  c(5,15,25, 35, 45, 55, 65, 91)
 n_data_year <- length(data_year)
-n_data_year1 <- n_data_year
 n_data_age <- length(a_lo)
-#### Unvaccinated
-## Symptomatic (Primary)
+
 I0 = matrix(0, nrow = n_age, ncol = n_sero, byrow = TRUE)
-# I0[40,] = c(1800,5,.0025,1)  #c(5000,100,1,1)
-# I0 = array(init[index_I], dim=c(n_age, n_sero))
-## Asymptomatic (Primary)
-A0 = matrix(0, nrow = n_age, ncol = n_sero, byrow = TRUE)
-## Susceptible secondary infection
-# frac_serotype <- c(0.38891122, 0.57453485, 0.02596476, 0.01058918)  
-frac_serotype <- c(.352860, .490160, .111505,  .045475)  # c(0.39, 0.58, 0.02, 0.01)  
+
+frac_serotype <- c(.352860, .490160, .111505,  .045475)    
 
 C0 = 0.0*t(frac_serotype*t(array(rep(primary*pop_each_age_group,n_sero), dim=c(n_age,n_sero))))
 
@@ -305,19 +160,16 @@ S0 = 1*t(frac_serotype*t(array(rep(primary*pop_each_age_group,n_sero), dim=c(n_a
 
 ## Symptomatic (Secondary infection)
 I_ij0 = array(0,dim = c(n_age, n_sero))
-## Asymptomatic (Secondary Infection)
-A_ij0 = array(0,dim = c(n_age, n_sero))
-
-H0 = rep(0, n_age)
 ## Recovered from Secondary infection
 R0 =  sero_p*pop_each_age_group - rowSums(S0) - rowSums(C0) # secondary*pop_each_age_group 
 
 ## Susceptible population
-S0_all =  pop_each_age_group - rowSums(I0+A0+C0+S0) -rowSums(I_ij0+A_ij0) - (H0+R0)
+S0_all =  pop_each_age_group - rowSums(I0+C0+S0) -rowSums(I_ij0) - R0
 
 total_pop_age0 <- pop_each_age_group  
+
+
 inc_symp0 <- array(0, dim=c(n_data_year, n_age))
-# inc_symp0[1] <- 400
 agg_inc_symp0 <- array(0,n_age)
 
 factor <- .01
@@ -327,61 +179,41 @@ S_m0 = factor*total_human
 # ## Exposed Mosquito
 E_m0 = c(0,0,0,0)
 # ## infected mosquito
-I_m0 = c(2e-2,5e-3,1e-2,1e-6)  #c(.01,.1,.01,0) #c(.01,5,.01,1) #c(0,0,0,0)# c(.0001,.001,.0001,0)
+I_m0 = c(.00005,.001,.1,1e-6)  ##c(2e-2,5e-3,1e-2,1e-6)  (previous one)
 
 ```
 
 
 
 ```{r}
-tt <- t
+# tt <- t
 ## biting rate per mosquito
 b = 15
-
-delta0 = 0.0
-b_tt = b*(1+delta0*sin(2*pi*tt/365))
-
-
 # Transmission rate from infected human to mosquito
 beta_h = c(0.20,0.20,0.20,0.20)   
 
 # Transmission rate from mosquitoes infected 
-# with different serotypes to human
-# beta_m1 = 0.175 #0.164    #0.20   # 0.195   #0.195 (better) ## 0.175 (C0_factor=1)
-# beta_m2 = 0.188 #0.184  #0.208  #0.215   #0.208(better)  ## 0.188 (C0_factor =1)
-# beta_m3 = 0.162 #0.160  # 0.08  #0.157
-# beta_m4 = 0.05
-
-
 beta_m1 = 0.166 #0.164    #0.20   # 0.195   #0.195 (better) ## 0.175 (C0_factor=1)
 beta_m2 = 0.176 #0.184  #0.208  #0.215   #0.208(better)  ## 0.188 (C0_factor =1)
 beta_m3 = 0.152 #0.160  # 0.08  #0.157
 beta_m4 = 0.144  #0.05
 
 beta_m = c(beta_m1, beta_m2, beta_m3, beta_m4)
- 
 
-# fraction of total primary infection becomes symptomatic
-rho_1 = rep(0.10, n_age)
-# fraction of symptomatic for secondary infection
-rho_2 = rep(0.30, n_age)
-
-ratio_p_s = 1/2
+ratio_p_s = 1  #1/2 
 # Infectious period primary infection
 gamma_1 = 1/4
 # Infectious period secondary infection
 gamma_2 = 1/4
-# infectiousness of asymptomatic relative to symptomatic
-kai = 1
+
 #
 alpha = 1/(1*365)
 # rate of hospitalization for primary infection
-xi_1 = 0*0.30/4
-# rate of hospitalization for secondary infection
-xi_2 = 0*0.30
+# xi_1 = 0*0.30/4
+# # rate of hospitalization for secondary infection
+# xi_2 = 0*0.30
 # extrinsic incubation period
-sigma_m=1/10
-
+sigma_m = 1/10
 ```
 
 
@@ -389,95 +221,94 @@ sigma_m=1/10
 # compile the model
 
 ```{r, eval=TRUE}
-dengue_model <- odin.dust::odin_dust("~/codes/dengue_main/test/model_fitting_age.R", debug_enable=TRUE)
+
+path_to_model <-  here::here("fitting", "model_fitting_age.R")
+dengue_model <- odin.dust::odin_dust(path_to_model)
 
 ```
 
-```{r, eval=FALSE}
-par <- list(
-  tt = tt,
-  l_t = l_t,
-  u_t = u_t,
-  a_up = a_up,
-  a_lo = a_lo,
-  n_data_year = n_data_year,
-  n_data_year1 = n_data_year1,
-  n_data_age = n_data_age,
-  n_age = n_age,
-  n_sero = n_sero,
-  beta_h = beta_h,
-  beta_m1 = beta_m1,
-  beta_m2 = beta_m2,
-  beta_m3 = beta_m3,
-  beta_m4 = beta_m4,
-  b_tt = b_tt,
-  kai = kai,                     
-  rho_1 = rho_1,               
-  rho_2 = rho_2, 
-  ratio_p_s = ratio_p_s,
-  sigma_m = sigma_m,              
-  alpha = alpha,                
-  gamma_1 = gamma_1,              
-  gamma_2 = gamma_2,              
-  xi_1 = xi_1,         
-  xi_2 = xi_2, 
-  
-  lambda_hum_tt = lambda_hum_tt, 
-  death_hum_tt = death_hum_tt,  
-  lambda_mos = lambda_mos,          
-  death_mos = death_mos,            
-  age_rate = age_rate,
-   
-  I0 = I0,
-  A0 = A0,
-  C0 = C0,
-  S0 = S0,
-  I_ij0 = I_ij0,
-  A_ij0 = A_ij0,
-  H0 = H0,
-  R0 = R0,
-  S0_all = S0_all,
-  S_m0 = S_m0,
-  E_m0 = E_m0,
-  I_m0 = I_m0,
-  total_pop_age0 = total_pop_age0,
-  inc_symp0 = inc_symp0,
-  agg_inc_symp0 = agg_inc_symp0
-)
+```{r, eval=TRUE}
+# par <- list(
+#   l_t = l_t,
+#   u_t = u_t,
+#   a_up = a_up,
+#   a_lo = a_lo,
+#   n_data_year = n_data_year,
+#   n_data_age = n_data_age,
+#   n_age = n_age,
+#   n_sero = n_sero,
+#   beta_h = beta_h,
+#   beta_m1 = beta_m1,
+#   beta_m2 = beta_m2,
+#   beta_m3 = beta_m3,
+#   beta_m4 = beta_m4,
+#   b=b,
+#   rho_1 = rho_1,
+#   rho_2 = rho_2,
+#   rho_2_a1 = rho_2_a1,
+# rho_2_a2 = rho_2_a2,
+# rho_2_a3 = rho_2_a3,
+# rho_2_a4 = rho_2_a4,
+# rho_2_a5 = rho_2_a5,
+# rho_2_a6 = rho_2_a6,
+# rho_2_a7 = rho_2_a7,
+# rho_2_a8 = rho_2_a8,
+#   ratio_p_s = ratio_p_s,
+#   sigma_m = sigma_m,
+#   alpha = alpha,
+#   gamma_1 = gamma_1,
+#   gamma_2 = gamma_2,
+  # xi_1 = xi_1,
+  # xi_2 = xi_2,
+# 
+#   lambda_hum_tt = lambda_hum_tt,
+#   death_hum_tt = death_hum_tt,
+#   lambda_mos = lambda_mos,
+#   death_mos = death_mos,
+#   age_rate = age_rate,
+# 
+#   I0 = I0,
+#   C0 = C0,
+#   S0 = S0,
+#   I_ij0 = I_ij0,
+# 
+#   R0 = R0,
+#   S0_all = S0_all,
+#   S_m0 = S_m0,
+#   E_m0 = E_m0,
+#   I_m0 = I_m0,
+#   total_pop_age0 = total_pop_age0,
+#   inc_symp0 = inc_symp0,
+#   agg_inc_symp0 = agg_inc_symp0
+# )
 ```
 
 #### instance of the model
 
-```{r, eval=FALSE}
-model <- dengue_model$new(par, time = 1, n_particles = 1,
-                               ode_control=list(max_steps=10000000))
+```{r}
+  # model <- dengue_model$new(par, time = 1, n_particles = 1,
+  #                                   ode_control = list(max_steps = 10000000,
+  #                                                      step_size_min = 1e-20,
+  #                                                      debug_record_step_times = TRUE))
 ```
 
 ```{r, eval=FALSE}
-  x <- model$simulate(tt)
+# tt <- 1:1000
+#    x <- model$simulate(tt)
+#    idx_inc <- model$info()$index$N_total_age
+#    inci <- x[idx_inc,,]
 ```
 
 
 ### Model fitting to annual reported cases data
 ```{r}
-# Likelihood function
-# dengue_incidence_case_compare <- function(state, observed, pars = NULL) {
-#   # 
-#   ll=dpois(x=floor(observed$cases_p_100k), lambda=state["inc_symp_p_100k",,drop=TRUE],log=TRUE)
-#   
-#   # mu = state["inc_symp_p_100k",,drop = TRUE]
-#   # sigma = 200
-#   # ll = dnbinom(x=floor(observed$cases_p_100k), size = (mu^2/(sigma^2 - mu)), prob = mu/(sigma^2),log = TRUE)
-#   # 
-#   return(ll)
-# }
+
 
 # ## for age specific incidence data
 dengue_incidence_case_compare <- function(state, observed, pars = NULL) {
-
-  # age_inc = observed[!(names(observed) %in% c("year", "day"))]
-
   
+  
+  ## incidence per 100k
   ll_1=dpois(x=floor(observed$`0-4y_inc_p_100k`), lambda=state["inc1",,drop=TRUE],log=TRUE)
 
   ll_2=dpois(x=floor(observed$`5-14y_inc_p_100k`), lambda=state["inc2",,drop=TRUE],log=TRUE)
@@ -493,44 +324,31 @@ dengue_incidence_case_compare <- function(state, observed, pars = NULL) {
   ll_7=dpois(x=floor(observed$`55-64y_inc_p_100k`), lambda=state["inc7",,drop=TRUE],log=TRUE)
 
   ll_8=dpois(x=floor(observed$`65+y_inc_p_100k`), lambda=state["inc8",,drop=TRUE],log=TRUE)
+  
+  
+  ## Absolute cases
+  
+  # ll_1=dpois(x=floor(observed$`0-4y`), lambda=state["inc1",,drop=TRUE],log=TRUE)
+  # 
+  # ll_2=dpois(x=floor(observed$`5-14y`), lambda=state["inc2",,drop=TRUE],log=TRUE)
+  # 
+  # ll_3=dpois(x=floor(observed$`15-24y`), lambda=state["inc3",,drop=TRUE],log=TRUE)
+  # 
+  # ll_4=dpois(x=floor(observed$`25-34y`), lambda=state["inc4",,drop=TRUE],log=TRUE)
+  # 
+  # ll_5=dpois(x=floor(observed$`35-44y`), lambda=state["inc5",,drop=TRUE],log=TRUE)
+  # 
+  # ll_6=dpois(x=floor(observed$`45-54y`), lambda=state["inc6",,drop=TRUE],log=TRUE)
+  # 
+  # ll_7=dpois(x=floor(observed$`55-64y`), lambda=state["inc7",,drop=TRUE],log=TRUE)
+  # 
+  # ll_8=dpois(x=floor(observed$`65+y`), lambda=state["inc8",,drop=TRUE],log=TRUE)
+  
 
   ll = ll_1 + ll_2 +ll_3 +ll_4 +ll_5 +ll_6 +ll_7 +ll_8
 
   return(ll)
 }
-
-## for agre specific incidence data
-# dengue_incidence_case_compare <- function(state, observed, pars = NULL) {
-# 
-#   # age_inc = observed[!(names(observed) %in% c("year", "day"))]
-#   
-#   # age_inc = c(observed$`0-4y_inc_p_100k`, observed$`5-14y_inc_p_100k`,
-#   #             observed$`15-24y_inc_p_100k`, observed$`25-34y_inc_p_100k`,
-#   #             observed$`35-44y_inc_p_100k`, observed$`45-54y_inc_p_100k`,
-#   #             observed$`55-64y_inc_p_100k`, observed$`65+y_inc_p_100k`)
-#    
-#   ll_1=sum(dpois(x=floor(observed$`0-4y_inc_p_100k`), lambda=state["agg_inc1",,drop=TRUE],log=TRUE))
-#   
-#   ll_2=sum(dpois(x=floor(observed$`5-14y_inc_p_100k`), lambda=state["agg_inc2",,drop=TRUE],log=TRUE))
-#   
-#   ll_3=sum(dpois(x=floor(observed$`15-24y_inc_p_100k`), lambda=state["agg_inc3",,drop=TRUE],log=TRUE))
-#   
-#   ll_4=sum(dpois(x=floor(observed$`25-34y_inc_p_100k`), lambda=state["agg_inc4",,drop=TRUE],log=TRUE))
-#   
-#   ll_5=sum(dpois(x=floor(observed$`35-44y_inc_p_100k`), lambda=state["agg_inc5",,drop=TRUE],log=TRUE))
-#   
-#   ll_6=sum(dpois(x=floor(observed$`45-54y_inc_p_100k`), lambda=state["agg_inc6",,drop=TRUE],log=TRUE))
-#   
-#   ll_7=sum(dpois(x=floor(observed$`55-64y_inc_p_100k`), lambda=state["agg_inc7",,drop=TRUE],log=TRUE))
-#   
-#   ll_8=sum(dpois(x=floor(observed$`65+y_inc_p_100k`), lambda=state["agg_inc8",,drop=TRUE],log=TRUE))
-#   
-#   ll = ll_1 + ll_2 +ll_3 +ll_4 +ll_5 +ll_6 +ll_7 +ll_8 
-#  
-#   return(ll)
-# }
-
-
 
 
 dengue_incidence_data <- mcstate::particle_filter_data(data = reported_cases, time = "day",
@@ -549,19 +367,6 @@ dengue_incidence_data <- mcstate::particle_filter_data(data = reported_cases, ti
                                                 model = dengue_model, 
                                                 compare = dengue_incidence_case_compare, 
                                                 index=index)
-
-    # priors=list(
-    # 
-    # mcstate::pmcmc_parameter("rho_1", 0.1, min = 0, max=1,prior = function(a){
-    #   dunif(a,min=0, max=0.1, log=TRUE)
-    # })
-    # 
-    # mcstate::pmcmc_parameter("rho_2", 0.3, min = 0, max=1,prior = function(a){
-    #   dunif(a,min=0, max=1, log=TRUE)
-    # })
-    
-    # )
-  
   
     priors=list(
 
@@ -597,69 +402,54 @@ dengue_incidence_data <- mcstate::particle_filter_data(data = reported_cases, ti
       dunif(a,min=0, max= 1, log=TRUE)
     })
    
-   #########
-# 
-#      mcstate::pmcmc_parameter("rho_2_a1", 0.1, min = 0, max=1,prior = function(a){
-#       dunif(a,min=0, max=1, log=TRUE)
-#     }),
-#     
-#        mcstate::pmcmc_parameter("rho_2_a2", 0.1, min = 0, max=1,prior = function(a){
-#       dunif(a,min=0, max=1, log=TRUE)
-#     }),
-# 
-#        mcstate::pmcmc_parameter("rho_2_a3", 0.1, min = 0, max=1,prior = function(a){
-#       dunif(a,min=0, max=1, log=TRUE)
-#     }),
-# 
-#        mcstate::pmcmc_parameter("rho_2_a4", 0.1, min = 0, max=1,prior = function(a){
-#       dunif(a,min=0, max= 1, log=TRUE)
-#     }),
-# 
-#    mcstate::pmcmc_parameter("rho_2_a5", 0.1, min = 0, max=1,prior = function(a){
-#       dunif(a,min=0, max= 1, log=TRUE)
-#     }),
-# 
-#       mcstate::pmcmc_parameter("rho_2_a6", 0.1, min = 0, max=1,prior = function(a){
-#       dunif(a,min=0, max= 1, log=TRUE)
-#     }),
-# 
-#       mcstate::pmcmc_parameter("rho_2_a7", 0.1, min = 0, max=1,prior = function(a){
-#       dunif(a,min=0, max= 1, log=TRUE)
-#     }),
-# 
-#       mcstate::pmcmc_parameter("rho_2_a8", 0.1, min = 0, max=1,prior = function(a){
-#       dunif(a,min=0, max= 1, log=TRUE)
-#     })
-
+ 
 
     )
   
   
 ```    
     
+    
+    
 ```{r}
 
-  make_transform <- function(tt, n_age, n_sero, 
-                             beta_h, beta_m1, beta_m2,beta_m3, beta_m4, 
-                             b_tt, l_t, u_t, 
-                             a_lo, a_up,
-                             kai, sigma_m, alpha,                
-                             gamma_1, gamma_2,              
-                             xi_1, xi_2, lambda_hum_tt, 
+  make_transform <- function(n_age,
+                             n_sero, 
+                             beta_h, 
+                             beta_m1, 
+                             beta_m2,
+                             beta_m3, 
+                             beta_m4, 
+                             b, 
+                             l_t,
+                             u_t, 
+                             a_lo, 
+                             a_up,
+                             sigma_m, 
+                             alpha,                
+                             gamma_1, 
+                             gamma_2,              
+                             lambda_hum_tt, 
                              death_hum_tt,
                              n_data_year,
-                             n_data_year1,
                              n_data_age,
-                             rho_1,
-                             rho_2,
                              ratio_p_s,
-                             
-                             lambda_mos, death_mos, age_rate, 
-                             I0, A0, C0, S0, I_ij0, A_ij0, H0, R0,
-                             S0_all, S_m0, E_m0, I_m0, total_pop_age0,
-                             inc_symp0, agg_inc_symp0) {
+                             lambda_mos, 
+                             death_mos, 
+                             age_rate, 
+                             I0,
+                             C0, 
+                             S0, 
+                             I_ij0, 
+                             R0,
+                             S0_all, 
+                             S_m0, 
+                             E_m0, 
+                             I_m0, 
+                             total_pop_age0,
+                             inc_symp0, 
+                             agg_inc_symp0) {
 list(
-  tt = tt,
   n_age = n_age,
   n_sero = n_sero,
   beta_h = beta_h,
@@ -667,24 +457,17 @@ list(
   beta_m2 = beta_m2,
   beta_m3 = beta_m3,
   beta_m4 = beta_m4,
-  b_tt = b_tt,
+  b = b,
   l_t = l_t,
   u_t = u_t,
   a_lo = a_lo,
   a_up = a_up,
   n_data_year = n_data_year,
-  n_data_year1 = n_data_year1,
   n_data_age = n_data_age,
-  kai = kai,                     
   sigma_m = sigma_m,              
   alpha = alpha,                
   gamma_1 = gamma_1,              
   gamma_2 = gamma_2,              
-  xi_1 = xi_1,         
-  xi_2 = xi_2,   
-  
-  rho_1 = rho_1,
-  rho_2 = rho_2,
   ratio_p_s = ratio_p_s,
   
   lambda_hum_tt = lambda_hum_tt, 
@@ -695,12 +478,9 @@ list(
   age_rate = age_rate,
    
   I0 = I0,
-  A0 = A0,
   C0 = C0,
   S0 = S0,
   I_ij0 = I_ij0,
-  A_ij0 = A_ij0,
-  H0 = H0,
   R0 = R0,
   S0_all = S0_all,
   S_m0 = S_m0,
@@ -713,7 +493,6 @@ list(
                                
     function(theta) {
       list(
-  tt = tt,
   n_age = n_age,
   n_sero = n_sero,
   beta_h = beta_h,
@@ -721,17 +500,13 @@ list(
   beta_m2 = beta_m2,
   beta_m3 = beta_m3,
   beta_m4 = beta_m4,
-  b_tt = b_tt,
+  b = b,
   l_t = l_t,
   u_t = u_t,
   a_lo = a_lo,
   a_up = a_up,
   n_data_year = n_data_year,
-  n_data_year1 = n_data_year1,
   n_data_age = n_data_age,
-  kai = kai,                     
-  # rho_1 = theta[["rho_1"]],               
-  # rho_2 = theta[["rho_2"]],   
   rho_2_a1 = theta[["rho_2_a1"]],
   rho_2_a2 = theta[["rho_2_a2"]],
   rho_2_a3 = theta[["rho_2_a3"]],
@@ -741,22 +516,10 @@ list(
   rho_2_a7 = theta[["rho_2_a7"]],
   rho_2_a8 = theta[["rho_2_a8"]],
   
-  # rho_2_a1 = theta[["rho_2_a1"]],
-  # rho_2_a2 = theta[["rho_2_a2"]],
-  # rho_2_a3 = theta[["rho_2_a3"]],
-  # rho_2_a4 = theta[["rho_2_a4"]],
-  # rho_2_a5 = theta[["rho_2_a5"]],
-  # rho_2_a6 = theta[["rho_2_a6"]],
-  # rho_2_a7 = theta[["rho_2_a7"]],
-  # rho_2_a8 = theta[["rho_2_a8"]],
   sigma_m = sigma_m,              
   alpha = alpha,                
   gamma_1 = gamma_1,              
   gamma_2 = gamma_2,              
-  xi_1 = xi_1,         
-  xi_2 = xi_2,       
-  rho_1 = rho_1,
-  rho_2 = rho_2,
   ratio_p_s = ratio_p_s,
   
   lambda_hum_tt = lambda_hum_tt, 
@@ -767,12 +530,9 @@ list(
   age_rate = age_rate,
    
   I0 = I0,
-  A0 = A0,
   C0 = C0,
   S0 = S0,
   I_ij0 = I_ij0,
-  A_ij0 = A_ij0,
-  H0 = H0,
   R0 = R0,
   S0_all = S0_all,
   S_m0 = S_m0,
@@ -787,7 +547,7 @@ list(
   
   
   
-  transform <- make_transform(tt = tt,
+  transform <- make_transform(
   n_age = n_age,
   n_sero = n_sero,
   beta_h = beta_h,
@@ -795,15 +555,14 @@ list(
   beta_m2 = beta_m2,
   beta_m3 = beta_m3,
   beta_m4 = beta_m4,
-  b_tt = b_tt,
+  b = b,
   l_t = l_t,
   u_t = u_t,
   a_lo = a_lo,
   a_up = a_up,
   n_data_year = n_data_year,
-  n_data_year1 = n_data_year1,
   n_data_age = n_data_age,
-  kai = kai,                     
+                  
               
   sigma_m = sigma_m,              
   alpha = alpha,                
@@ -811,10 +570,10 @@ list(
   gamma_1 = gamma_1,              
   gamma_2 = gamma_2,              
            
-  xi_1 = xi_1,         
-  xi_2 = xi_2,       
-  rho_1 = rho_1,
-  rho_2 = rho_2,
+  # xi_1 = xi_1,         
+  # xi_2 = xi_2,       
+  # rho_1 = rho_1,
+  # rho_2 = rho_2,
   ratio_p_s = ratio_p_s,
   
   lambda_hum_tt = lambda_hum_tt, 
@@ -825,12 +584,10 @@ list(
   age_rate = age_rate,
    
   I0 = I0,
-  A0 = A0,
   C0 = C0,
   S0 = S0,
   I_ij0 = I_ij0,
-  A_ij0 = A_ij0,
-  H0 = H0,
+
   R0 = R0,
   S0_all = S0_all,
   S_m0 = S_m0,
@@ -846,22 +603,22 @@ list(
 ```{r}
 
 
-  n_param=8
-  proposal_matrix <- diag(1e-2, n_param)
+  n_param = 8
+  proposal_matrix <- diag(1e-5, n_param)
     
   mcmc_pars <- mcstate::pmcmc_parameters$new(priors,
                                              proposal = proposal_matrix,
                                              transform = transform
                                              )
   
-  control <- mcstate::pmcmc_control(n_steps = 1e4,
+  control <- mcstate::pmcmc_control(n_steps = 5e3,
                                     n_workers = 8,
                                     n_threads_total = 8,
                                     n_burnin = 500,
                                     n_chains = 8,
                                     adaptive_proposal = TRUE,
-                                    save_state = FALSE,
-                                    save_trajectories = FALSE,
+                                    save_state = TRUE,
+                                    save_trajectories = TRUE,
                                     progress = TRUE )
   
   # run pmcmc
@@ -878,16 +635,49 @@ list(
   
   # # Pairwise correlation plot
   # par(mfrow = c(1,1))
-  pairs(mcmc_run$pars[])
+  # pairs(mcmc_run$pars[])
   
-#   calculate_median_and_ci <- function(x){
-#     c(median(x), quantile(x,c(0.025, 0.975)))
-# }
-  
+
   
   post_par <- mcmc_run$pars
-# saveRDS(post_par, file = "model_output/posterior_rep_rate.rds")
 
+  
+  ## Tuning PMCMC (run again)
+  
+# proposal_matrix1 <- cov(mcmc_run$pars)
+# 
+# mcmc_pars1 <- mcstate::pmcmc_parameters$new(priors,
+#                                            proposal_matrix1,
+#                                            transform)
+# 
+# control1 <- mcstate::pmcmc_control(n_steps = 5e3,
+#                                     n_workers = 8,
+#                                     n_threads_total = 8,
+#                                     n_burnin = 500,
+#                                     n_chains = 8,
+#                                     adaptive_proposal = TRUE,
+#                                     save_state = TRUE,
+#                                     save_trajectories = TRUE,
+#                                     progress = TRUE )
+# 
+# 
+#   # run pmcmc
+#   mcmc_run <- mcstate::pmcmc(mcmc_pars1, filter, control = control1)
+#   
+#   # Plot MCMC output
+#   mcmc_out1 <- coda::as.mcmc(cbind(mcmc_run$probabilities, mcmc_run$pars))
+#   summary(mcmc_out1)
+# 
+
+  
+   # 
+   # saveRDS(post_par,
+   #        file = here::here("model_output", "posterior_rep_rate.rds"))
+
+     # save when the primary and secondary rates are same only depends on age
+   # saveRDS(post_par,
+   #        file = here::here("fitting/fitting_output", "posterior_rep_rate_pri_eq_sec.rds"))
+  
 ```
 
 
@@ -912,18 +702,13 @@ plot(mcmc_run$pars[, "rho_2_a7"], type = "l", xlab = "Iteration",
 plot(mcmc_run$pars[, "rho_2_a8"], type = "l", xlab = "Iteration",
      ylab = TeX("$rho_2^{8}$"))
 
-# plot(mcmc_run$pars[, "rho_2"], type = "l", xlab = "Iteration",
-#      ylab = expression("rho_2"))
-
 ```
 
 ```{r}
-mcmc_sample <- mcstate::pmcmc_sample(mcmc_run, n_sample = 500)
+mcmc_sample <- mcstate::pmcmc_sample(mcmc_run, n_sample = 200)
 
 # extract the trajectories for prediction
 state <- mcmc_sample$trajectories$state
-
-
 
 modelled_inc1 <- colSums(t(state["inc1", , ][-1,]))/7
 modelled_inc2 <- colSums(t(state["inc2", , ][-1,]))/7
@@ -933,8 +718,6 @@ modelled_inc5 <- colSums(t(state["inc5", , ][-1,]))/7
 modelled_inc6 <- colSums(t(state["inc6", , ][-1,]))/7
 modelled_inc7 <- colSums(t(state["inc7", , ][-1,]))/7
 modelled_inc8 <- colSums(t(state["inc8", , ][-1,]))/7
-
-
 
 
 inc_11 <- rbind(modelled_inc1,modelled_inc2,
@@ -947,13 +730,7 @@ calculate_quantiles <- function(matrix_data, probs = c(0.05, 0.5, 0.95)) {
   apply(matrix_data, 1, quantile, probs = probs, na.rm = TRUE)
 }
 
-
-
 incc <- calculate_quantiles(inc_11)
-
-
-
-
 ```
 
 
@@ -964,10 +741,6 @@ incc <- calculate_quantiles(inc_11)
 df <- data.frame(cbind(t(incc), t(data.matrix(reported_cases[, !names(reported_cases) %in% c("year","day")])), stringsAsFactors = FALSE))
 names(df) <- c("ci_low", "mean", "ci_up", "year1", "year2","year3","year4","year5","year6","year7","age_group")
 df$age_group <- 1:8
-# df$data_annual_inc <- reported_cases$cases_p_100k
-
-# labels = as.character(df$year)
-
 
 
 ggplot(df, aes(age_group, mean)) +
@@ -999,36 +772,38 @@ ggplot(df, aes(age_group, mean)) +
   theme(axis.text.y = element_text( size = 25, colour = "black")) +
 xlab("Age groups") +
 ylab("Dengue cases per 100k")
-  # ggtitle("Model fit to age-specific reported dengue cases (2014-20)")+
-  # theme(plot.title = element_text(hjust = 0.5))
-
+#   ggtitle("Model fit to age-specific reported dengue cases (2014-20)")+
+#   theme(plot.title = element_text(hjust = 0.5))
+# 
 # ggsave('test.png', units="in", width=10, height=8, dpi=300)
 
 
 
 
 ### for time of each of the age groups
-# 
-# mod_inc1 <- calculate_quantiles(t(state["inc1", ,-1 ]))
-# mod_inc2 <- calculate_quantiles(t(state["inc2", , -1]))
-# mod_inc3 <- calculate_quantiles(t(state["inc3", , -1]))
-# mod_inc4 <- calculate_quantiles(t(state["inc4", , -1]))
-# mod_inc5 <- calculate_quantiles(t(state["inc5", , -1]))
-# mod_inc6 <- calculate_quantiles(t(state["inc6", , -1]))
-# mod_inc7 <- calculate_quantiles(t(state["inc7", , -1]))
-# mod_inc8 <- calculate_quantiles(t(state["inc8", , -1]))
-# 
-# 
-# 
-# df1 <- data.frame(t(mod_inc1),t(mod_inc2),t(mod_inc3),t(mod_inc4),t(mod_inc5),t(mod_inc6),t(mod_inc7),t(mod_inc8) )
-# names(df1) <- c("ci_low1", "mean1", "ci_up1",
-#                "ci_low2", "mean2", "ci_up2",
-#                "ci_low3", "mean3", "ci_up3",
-#                "ci_low4", "mean4", "ci_up4",
-#                "ci_low5", "mean5", "ci_up5",
-#                "ci_low6", "mean6", "ci_up6",
-#                "ci_low7", "mean7", "ci_up7",
-#                "ci_low8", "mean8", "ci_up8")
+#
+mod_inc1 <- calculate_quantiles(t(state["inc1", ,-1 ]))
+mod_inc2 <- calculate_quantiles(t(state["inc2", , -1]))
+mod_inc3 <- calculate_quantiles(t(state["inc3", , -1]))
+mod_inc4 <- calculate_quantiles(t(state["inc4", , -1]))
+mod_inc5 <- calculate_quantiles(t(state["inc5", , -1]))
+mod_inc6 <- calculate_quantiles(t(state["inc6", , -1]))
+mod_inc7 <- calculate_quantiles(t(state["inc7", , -1]))
+mod_inc8 <- calculate_quantiles(t(state["inc8", , -1]))
+
+
+#
+df1 <- data.frame(t(mod_inc1),t(mod_inc2),t(mod_inc3),t(mod_inc4),t(mod_inc5),t(mod_inc6),t(mod_inc7),t(mod_inc8) )
+names(df1) <- c("ci_low1", "mean1", "ci_up1",
+               "ci_low2", "mean2", "ci_up2",
+               "ci_low3", "mean3", "ci_up3",
+               "ci_low4", "mean4", "ci_up4",
+               "ci_low5", "mean5", "ci_up5",
+               "ci_low6", "mean6", "ci_up6",
+               "ci_low7", "mean7", "ci_up7",
+               "ci_low8", "mean8", "ci_up8")
+
+## incidence per 100k
 # df1$year <- as.integer(reported_cases$year)
 # df1$age1 <- reported_cases$`0-4y_inc_p_100k`
 # df1$age2 <- reported_cases$`5-14y_inc_p_100k`
@@ -1038,145 +813,158 @@ ylab("Dengue cases per 100k")
 # df1$age6 <- reported_cases$`45-54y_inc_p_100k`
 # df1$age7 <- reported_cases$`55-64y_inc_p_100k`
 # df1$age8 <- reported_cases$`65+y_inc_p_100k`
-# 
-# age1 <- ggplot(df1, aes(year, mean1)) +
-#   geom_line() +
-#   geom_line(aes(year, mean1), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin= ci_low1,ymax= ci_up1),alpha=0.5, fill= "lightblue")+
-#   geom_point(aes(year,age1), size=2)+
-#   theme_classic()+
-#   xlab("Year") +
-#   ylab("0-4 y")
-# 
-# age2 <- ggplot(df1, aes(year, mean2)) +
-#   geom_line() +
-#   geom_line(aes(year, mean2), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin= ci_low2,ymax= ci_up2),alpha=0.5, fill= "lightblue")+
-#   geom_point(aes(year,age2), size=2)+
-#   theme_classic()+
-#   xlab("Year") +
-#   ylab("5-14 y")
-# 
-# age3 <- ggplot(df1, aes(year, mean3)) +
-#   geom_line() +
-#   geom_line(aes(year, mean3), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin= ci_low3,ymax= ci_up3),alpha=0.5, fill= "lightblue")+
-#   geom_point(aes(year,age3), size=2)+
-#   theme_classic()+
-#   xlab("Year") +
-#   ylab("15-24 y")
-# 
-# age4 <- ggplot(df1, aes(year, mean4)) +
-#   geom_line() +
-#   geom_line(aes(year, mean4), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin= ci_low4,ymax= ci_up4),alpha=0.5, fill= "lightblue")+
-#   geom_point(aes(year,age4), size=2)+
-#   theme_classic()+
-#   xlab("Year") +
-#   ylab("25-34 y")
-# 
-# age5 <- ggplot(df1, aes(year, mean5)) +
-#   geom_line() +
-#   geom_line(aes(year, mean5), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin= ci_low5,ymax= ci_up5),alpha=0.5, fill= "lightblue")+
-#   geom_point(aes(year,age5), size=2)+
-#   theme_classic()+
-#   xlab("Year") +
-#   ylab("35-44 y")
-# 
-# age6 <- ggplot(df1, aes(year, mean6)) +
-#   geom_line() +
-#   geom_line(aes(year, mean6), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin= ci_low6,ymax= ci_up6),alpha=0.5, fill= "lightblue")+
-#   geom_point(aes(year,age6), size=2)+
-#   theme_classic()+
-#   xlab("Year") +
-#   ylab("45-54 y")
-# 
-# 
-# 
-# age7 <- ggplot(df1, aes(year, mean7)) +
-#   geom_line() +
-#   geom_line(aes(year, mean7), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin= ci_low7,ymax= ci_up7),alpha=0.5, fill= "lightblue")+
-#   geom_point(aes(year,age7), size=2)+
-#   theme_classic()+
-#   xlab("Year") +
-#   ylab("55-64 y")
-# 
-# 
-# age8 <- ggplot(df1, aes(year, mean8)) +
-#   geom_line() +
-#   geom_line(aes(year, mean8), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin = ci_low8,ymax = ci_up8),alpha = 0.5, fill= "lightblue")+
-#   geom_point(aes(year,age8), size = 2) +
-#   theme_classic() +
-#   xlab("Year") +
-#   ylab("65+ y")
-# 
-# ggarrange(age1, age2, age3, age4, age5, age6, age7, age8, nrow=2, ncol=4)
-# 
-# 
+
+
+## absolute cases
+df1$year <- as.integer(reported_cases$year)
+df1$age1 <- reported_cases$`0-4y`
+df1$age2 <- reported_cases$`5-14y`
+df1$age3 <- reported_cases$`15-24y`
+df1$age4 <- reported_cases$`25-34y`
+df1$age5 <- reported_cases$`35-44y`
+df1$age6 <- reported_cases$`45-54y`
+df1$age7 <- reported_cases$`55-64y`
+df1$age8 <- reported_cases$`65+y`
+
+
+age1 <- ggplot(df1, aes(year, mean1)) +
+  geom_line() +
+  geom_line(aes(year, mean1), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin= ci_low1,ymax= ci_up1),alpha=0.5, fill= "lightblue")+
+  geom_point(aes(year,age1), size=2)+
+  theme_classic()+
+  xlab("Year") +
+  ylab("0-4 y")
+
+age2 <- ggplot(df1, aes(year, mean2)) +
+  geom_line() +
+  geom_line(aes(year, mean2), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin= ci_low2,ymax= ci_up2),alpha=0.5, fill= "lightblue")+
+  geom_point(aes(year,age2), size=2)+
+  theme_classic()+
+  xlab("Year") +
+  ylab("5-14 y")
+
+age3 <- ggplot(df1, aes(year, mean3)) +
+  geom_line() +
+  geom_line(aes(year, mean3), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin= ci_low3,ymax= ci_up3),alpha=0.5, fill= "lightblue")+
+  geom_point(aes(year,age3), size=2)+
+  theme_classic()+
+  xlab("Year") +
+  ylab("15-24 y")
+
+age4 <- ggplot(df1, aes(year, mean4)) +
+  geom_line() +
+  geom_line(aes(year, mean4), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin= ci_low4,ymax= ci_up4),alpha=0.5, fill= "lightblue")+
+  geom_point(aes(year,age4), size=2)+
+  theme_classic()+
+  xlab("Year") +
+  ylab("25-34 y")
+
+age5 <- ggplot(df1, aes(year, mean5)) +
+  geom_line() +
+  geom_line(aes(year, mean5), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin= ci_low5,ymax= ci_up5),alpha=0.5, fill= "lightblue")+
+  geom_point(aes(year,age5), size=2)+
+  theme_classic()+
+  xlab("Year") +
+  ylab("35-44 y")
+
+age6 <- ggplot(df1, aes(year, mean6)) +
+  geom_line() +
+  geom_line(aes(year, mean6), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin= ci_low6,ymax= ci_up6),alpha=0.5, fill= "lightblue")+
+  geom_point(aes(year,age6), size=2)+
+  theme_classic()+
+  xlab("Year") +
+  ylab("45-54 y")
+
+
+
+age7 <- ggplot(df1, aes(year, mean7)) +
+  geom_line() +
+  geom_line(aes(year, mean7), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin= ci_low7,ymax= ci_up7),alpha=0.5, fill= "lightblue")+
+  geom_point(aes(year,age7), size=2)+
+  theme_classic()+
+  xlab("Year") +
+  ylab("55-64 y")
+
+
+age8 <- ggplot(df1, aes(year, mean8)) +
+  geom_line() +
+  geom_line(aes(year, mean8), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin = ci_low8,ymax = ci_up8),alpha = 0.5, fill= "lightblue")+
+  geom_point(aes(year,age8), size = 2) +
+  theme_classic() +
+  xlab("Year") +
+  ylab("65+ y")
+
+ggarrange(age1, age2, age3, age4, age5, age6, age7, age8, nrow=2, ncol=4)
+
+
 
 #############
-# 
-# md_yr1 <- calculate_quantiles( (state[c("inc1", "inc2", "inc3", "inc4", "inc5", "inc6", "inc7", "inc8"), , 2]) )
-# md_yr2 <- calculate_quantiles( (state[c("inc1", "inc2", "inc3", "inc4", "inc5", "inc6", "inc7", "inc8"), , 3]) )
-# md_yr3 <- calculate_quantiles( (state[c("inc1", "inc2", "inc3", "inc4", "inc5", "inc6", "inc7", "inc8"), , 4]) )
-# md_yr4 <- calculate_quantiles( (state[c("inc1", "inc2", "inc3", "inc4", "inc5", "inc6", "inc7", "inc8"), , 5]) )
-# md_yr5 <- calculate_quantiles( (state[c("inc1", "inc2", "inc3", "inc4", "inc5", "inc6", "inc7", "inc8"), , 6]) )
-# md_yr6 <- calculate_quantiles( (state[c("inc1", "inc2", "inc3", "inc4", "inc5", "inc6", "inc7", "inc8"), , 7]) )
-# md_yr7 <- calculate_quantiles( (state[c("inc1", "inc2", "inc3", "inc4", "inc5", "inc6", "inc7", "inc8"), , 8]) )
-# 
-# df2 <- data.frame(t(md_yr1),t(md_yr2),t(md_yr3),t(md_yr4),t(md_yr5),t(md_yr6),t(md_yr7) )
-# names(df2) <- c("ci_low1", "mean1", "ci_up1",
-#                 "ci_low2", "mean2", "ci_up2",
-#                 "ci_low3", "mean3", "ci_up3",
-#                 "ci_low4", "mean4", "ci_up4",
-#                 "ci_low5", "mean5", "ci_up5",
-#                 "ci_low6", "mean6", "ci_up6",
-#                 "ci_low7", "mean7", "ci_up7")
-# df2$age <- 1:8
-# df2$yr1 <- t(reported_cases[reported_cases$year=="2014",!names(reported_cases) %in% c("year","day")]) 
-# df2$yr2 <- t(reported_cases[reported_cases$year=="2015",!names(reported_cases) %in% c("year","day")]) 
-# df2$yr3 <- t(reported_cases[reported_cases$year=="2016",!names(reported_cases) %in% c("year","day")]) 
-# df2$yr4 <- t(reported_cases[reported_cases$year=="2017",!names(reported_cases) %in% c("year","day")]) 
-# df2$yr5 <- t(reported_cases[reported_cases$year=="2018",!names(reported_cases) %in% c("year","day")]) 
-# df2$yr6 <- t(reported_cases[reported_cases$year=="2019",!names(reported_cases) %in% c("year","day")]) 
-# df2$yr7 <- t(reported_cases[reported_cases$year=="2020",!names(reported_cases) %in% c("year","day")]) 
-# 
-# 
-# 
-# yr <- ggplot(df2, aes(age, mean1)) +
-#   geom_line() +
-#   geom_line(aes(age, mean1), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin= ci_low1,ymax= ci_up1),alpha=0.5, fill= "lightblue")+
-#   geom_line(aes(age, mean2), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin= ci_low2,ymax= ci_up2),alpha=0.5, fill= "lightblue")+
-#   geom_line(aes(age, mean3), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin= ci_low3,ymax= ci_up3),alpha=0.5, fill= "lightblue")+
-#   geom_line(aes(age, mean4), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin= ci_low4,ymax= ci_up4),alpha=0.5, fill= "lightblue")+
-#   geom_line(aes(age, mean5), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin= ci_low5,ymax= ci_up5),alpha=0.5, fill= "lightblue")+
-#   geom_line(aes(age, mean6), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin= ci_low6,ymax= ci_up6),alpha=0.5, fill= "lightblue")+
-#   geom_line(aes(age, mean7), col= "darkblue", size=0.9) +
-#   geom_ribbon(aes(ymin= ci_low7,ymax= ci_up7),alpha=0.5, fill= "lightblue")+
-#   
-#   
-#   
-#   geom_line(aes(age,yr1), size=0.1, col="gray")+
-#   geom_line(aes(age,yr2), size=0.1, col="gray")+
-#   geom_line(aes(age,yr3), size=0.1, col="gray")+
-#   geom_line(aes(age,yr4), size=0.1, col="gray")+
-#   geom_line(aes(age,yr5), size=0.1, col="gray")+
-#   geom_line(aes(age,yr6), size=0.1, col="gray")+
-#   geom_line(aes(age,yr7), size=0.1, col="gray")+
-#   theme_classic()+
-#   xlab("Age") +
-#   ylab("incidence")
-# 
+# #
+md_yr1 <- calculate_quantiles( (state[c("inc1", "inc2", "inc3", "inc4", "inc5", "inc6", "inc7", "inc8"), , 2]) )
+md_yr2 <- calculate_quantiles( (state[c("inc1", "inc2", "inc3", "inc4", "inc5", "inc6", "inc7", "inc8"), , 3]) )
+md_yr3 <- calculate_quantiles( (state[c("inc1", "inc2", "inc3", "inc4", "inc5", "inc6", "inc7", "inc8"), , 4]) )
+md_yr4 <- calculate_quantiles( (state[c("inc1", "inc2", "inc3", "inc4", "inc5", "inc6", "inc7", "inc8"), , 5]) )
+md_yr5 <- calculate_quantiles( (state[c("inc1", "inc2", "inc3", "inc4", "inc5", "inc6", "inc7", "inc8"), , 6]) )
+md_yr6 <- calculate_quantiles( (state[c("inc1", "inc2", "inc3", "inc4", "inc5", "inc6", "inc7", "inc8"), , 7]) )
+md_yr7 <- calculate_quantiles( (state[c("inc1", "inc2", "inc3", "inc4", "inc5", "inc6", "inc7", "inc8"), , 8]) )
+
+df2 <- data.frame(t(md_yr1),t(md_yr2),t(md_yr3),t(md_yr4),t(md_yr5),t(md_yr6),t(md_yr7) )
+names(df2) <- c("ci_low1", "mean1", "ci_up1",
+                "ci_low2", "mean2", "ci_up2",
+                "ci_low3", "mean3", "ci_up3",
+                "ci_low4", "mean4", "ci_up4",
+                "ci_low5", "mean5", "ci_up5",
+                "ci_low6", "mean6", "ci_up6",
+                "ci_low7", "mean7", "ci_up7")
+df2$age <- 1:8
+df2$yr1 <- t(reported_cases[reported_cases$year=="2014",!names(reported_cases) %in% c("year","day")])
+df2$yr2 <- t(reported_cases[reported_cases$year=="2015",!names(reported_cases) %in% c("year","day")])
+df2$yr3 <- t(reported_cases[reported_cases$year=="2016",!names(reported_cases) %in% c("year","day")])
+df2$yr4 <- t(reported_cases[reported_cases$year=="2017",!names(reported_cases) %in% c("year","day")])
+df2$yr5 <- t(reported_cases[reported_cases$year=="2018",!names(reported_cases) %in% c("year","day")])
+df2$yr6 <- t(reported_cases[reported_cases$year=="2019",!names(reported_cases) %in% c("year","day")])
+df2$yr7 <- t(reported_cases[reported_cases$year=="2020",!names(reported_cases) %in% c("year","day")])
+#
+#
+#
+yr <- ggplot(df2, aes(age, mean1)) +
+  geom_line() +
+  geom_line(aes(age, mean1), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin= ci_low1,ymax= ci_up1),alpha=0.5, fill= "lightblue")+
+  geom_line(aes(age, mean2), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin= ci_low2,ymax= ci_up2),alpha=0.5, fill= "lightblue")+
+  geom_line(aes(age, mean3), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin= ci_low3,ymax= ci_up3),alpha=0.5, fill= "lightblue")+
+  geom_line(aes(age, mean4), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin= ci_low4,ymax= ci_up4),alpha=0.5, fill= "lightblue")+
+  geom_line(aes(age, mean5), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin= ci_low5,ymax= ci_up5),alpha=0.5, fill= "lightblue")+
+  geom_line(aes(age, mean6), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin= ci_low6,ymax= ci_up6),alpha=0.5, fill= "lightblue")+
+  geom_line(aes(age, mean7), col= "darkblue", size=0.9) +
+  geom_ribbon(aes(ymin= ci_low7,ymax= ci_up7),alpha=0.5, fill= "lightblue")+
+
+
+
+  geom_line(aes(age,yr1), size=0.1, col="gray")+
+  geom_line(aes(age,yr2), size=0.1, col="gray")+
+  geom_line(aes(age,yr3), size=0.1, col="gray")+
+  geom_line(aes(age,yr4), size=0.1, col="gray")+
+  geom_line(aes(age,yr5), size=0.1, col="gray")+
+  geom_line(aes(age,yr6), size=0.1, col="gray")+
+  geom_line(aes(age,yr7), size=0.1, col="gray")+
+  theme_classic()+
+  xlab("Age") +
+  ylab("incidence")
+#
 # yr
 
 
