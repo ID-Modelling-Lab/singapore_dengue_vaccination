@@ -1,7 +1,10 @@
 /presentations/*
 /Dengue_model_literature/*
 /code/model_output/*
+/code/others/*
 /Draft/*
+/cea_dengue/*
+/singapore_historical_vaccine_impact/*
 .Rproj.user
 .Rhistory
 .RData
