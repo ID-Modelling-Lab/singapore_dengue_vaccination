@@ -3,6 +3,9 @@
 /code/model_output/*
 /code/others/*
 /Draft/*
+/code/figure/old/*
+/code/figure/poster/*
+/code/figure/hosp_rate_scenario/*
 /cea_dengue/*
 /submission/*
 /singapore_historical_vaccine_impact/*
