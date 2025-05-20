@@ -1,0 +1,2 @@
+useDynLib(example)
+import(cinterpolate)

@@ -1,0 +1,5 @@
+add_labels              Annotated Violin Plot
+add_outliers            Annotated Violin Plot
+histoplot               histoplot
+vioplot                 Violin Plot
+vioplot.stats           Violin Plot Statistics

@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Rich FitzJohn" />
+
+<meta name="date" content="2023-11-28" />
+
+<title>ring</title>
+
+
+<style type="text/css">
+  code{white-space: pre-wrap;}
+  span.smallcaps{font-variant: small-caps;}
+  span.underline{text-decoration: underline;}
+  div.column{display: inline-block; vertical-align: top; width: 50%;}
+  div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+  ul.task-list{list-style: none;}
+    </style>
+
+
+
+<style type="text/css">
+  code {
+    white-space: pre;
+  }
+  .sourceCode {
+    overflow: visible;
+  }
+</style>
+<style type="text/css" data-origin="pandoc">
+a.sourceLine { display: inline-block; line-height: 1.25; }
+a.sourceLine { pointer-events: none; color: inherit; text-decoration: inherit; }
+a.sourceLine:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode { white-space: pre; position: relative; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+code.sourceCode { white-space: pre-wrap; }
+a.sourceLine { text-indent: -1em; padding-left: 1em; }
+}
+pre.numberSource a.sourceLine
+  { position: relative; left: -4em; }
+pre.numberSource a.sourceLine::before
+  { content: attr(title);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; pointer-events: all; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {  }
+@media screen {
+a.sourceLine::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">ring</h1>
+<h4 class="author">Rich FitzJohn</h4>
+<h4 class="date">2023-11-28</h4>
+
+
+<div id="TOC">
+<ul>
+<li><a href="#the-environment-buffer-ring_buffer_env">The environment buffer <code>ring_buffer_env</code></a><ul>
+<li><a href="#application-simulation-with-recent-history">Application: simulation with recent history</a></li>
+</ul></li>
+<li><a href="#the-bytes-buffer-ring_buffer_bytes">The bytes buffer <code>ring_buffer_bytes</code></a><ul>
+<li><a href="#striding">Striding</a></li>
+<li><a href="#the-typed-bytes-buffer-ring_buffer_bytes_typed">The typed bytes buffer <code>ring_buffer_bytes_typed</code></a></li>
+<li><a href="#the-translating-bytes-buffer-ring_buffer_bytes_translate">The translating bytes buffer <code>ring_buffer_bytes_translate</code></a></li>
+</ul></li>
+<li><a href="#the-c-api">The C API</a><ul>
+<li><a href="#a-nontrivial-example">A nontrivial example</a></li>
+</ul></li>
+<li><a href="#the-c-api-1">The C++ API</a></li>
+</ul>
+</div>
+
+<p>This package implements <a href="https://en.wikipedia.org/wiki/Ring_buffer">ring buffers</a>. A ring buffer can be used as a first-in-first-out (FIFO) buffer where the maximum size is known ahead of time. Because they do not grow in size, they are useful to avoid using more and more memory as a process runs. Because the data reading and writing happens in an (apparently) circular way, once data is added to the buffer it is not copied (in contrast if you used a vector then every time data is consumed you’d have to shuffle the vector around).</p>
+<p><code>ring</code> implements two different ring buffers that will likely suit different applications.</p>
+<ul>
+<li><code>ring_buffer_bytes</code> is implemented as a byte array in C, possibly with a “stride” indicating a set of bytes that go together. Once the data reaches the end of the array we start writing to the beginning again.</li>
+<li><code>ring_buffer_env</code> is implemented as a doubly linked list using R’s environments. This buffer can hold arbitrary R objects at each position.</li>
+</ul>
+<p>The target audience for this package is either other package developers who need a ring buffer in their package, or modellers who have decided that a ring buffer is the right data structure to help with their simulation model.</p>
+<p>For all buffers, <code>head</code> will refer to the next bit of the buffer to be written to, and <code>tail</code> will refer to the next bit of the buffer to be read. That is, elements are pushed onto the <code>head</code> of the buffer and retrieved from the <code>tail</code>. (There is no direct analogy between these terms and the R functions <code>head</code> and <code>tail</code> which operate on fixed-size vectors.)</p>
+<div id="the-environment-buffer-ring_buffer_env" class="section level1">
+<h1>The environment buffer <code>ring_buffer_env</code></h1>
+<p>This is the simplest buffer to understand because we don’t have to deal with raw vectors.</p>
+<p>To create a buffer that can hold up to 100 elements, use the <code>ring_buffer_env</code> function:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb1-1" title="1">buf &lt;-<span class="st"> </span>ring<span class="op">::</span><span class="kw">ring_buffer_env</span>(<span class="dv">100</span>)</a></code></pre></div>
+<p>This is an <a href="https://github.com/r-lib/R6">R6</a> class, with several methods:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb2-1" title="1">buf</a></code></pre></div>
+<pre><code>## &lt;Ring Buffer (ring_buffer_env)&gt;
+##   Public:
+##     copy: function (dest, n)
+##     duplicate: function ()
+##     free: function ()
+##     grow: function (n)
+##     head: function ()
+##     head_advance: function ()
+##     head_data: function ()
+##     head_offset: function (n)
+##     head_pos: function ()
+##     head_set: function (data)
+##     is_empty: function ()
+##     is_full: function ()
+##     mirror: function (dest)
+##     push: function (data, iterate = TRUE)
+##     read: function (n)
+##     read_head: function (n)
+##     reset: function (clear = FALSE)
+##     set: function (data, n)
+##     size: function ()
+##     tail: function ()
+##     tail_offset: function (n)
+##     tail_pos: function ()
+##     take: function (n)
+##     take_head: function (n)
+##     used: function ()</code></pre>
+<p>Operations on the class happen by running methods using <code>$</code>. So the size of the buffer:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb4-1" title="1">buf<span class="op">$</span><span class="kw">size</span>()</a></code></pre></div>
+<pre><code>## [1] 100</code></pre>
+<p>…the number of elements free and used:</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb6-1" title="1">buf<span class="op">$</span><span class="kw">free</span>()</a></code></pre></div>
+<pre><code>## [1] 100</code></pre>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb8-1" title="1">buf<span class="op">$</span><span class="kw">used</span>()</a></code></pre></div>
+<pre><code>## [1] 0</code></pre>
+<p>…whether the buffer is empty or full:</p>
+<div class="sourceCode" id="cb10"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb10-1" title="1">buf<span class="op">$</span><span class="kw">is_empty</span>()</a></code></pre></div>
+<pre><code>## [1] TRUE</code></pre>
+<div class="sourceCode" id="cb12"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb12-1" title="1">buf<span class="op">$</span><span class="kw">is_full</span>()</a></code></pre></div>
+<pre><code>## [1] FALSE</code></pre>
+<p>To start using the buffer we need to put some data in it. There are two main functions for adding data:</p>
+<ul>
+<li><code>buf$set(data, n)</code> sets <code>n</code> elements to be the value <code>data</code></li>
+<li><code>buf$push(data, iterate)</code> pushes <code>data</code> into the buffer, with the <code>iterate</code> argument indicating if we should iterate over <code>data</code> or treat it as a single element</li>
+</ul>
+<p>So to set the first 5 elements to be “a”, “b”, …, “e”, use:</p>
+<div class="sourceCode" id="cb14"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb14-1" title="1">buf<span class="op">$</span><span class="kw">push</span>(letters[<span class="dv">1</span><span class="op">:</span><span class="dv">5</span>])</a></code></pre></div>
+<p>The buffer is no longer empty</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb15-1" title="1">buf<span class="op">$</span><span class="kw">is_empty</span>()</a></code></pre></div>
+<pre><code>## [1] FALSE</code></pre>
+<p>…having 5 elements:</p>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb17-1" title="1">buf<span class="op">$</span><span class="kw">used</span>()</a></code></pre></div>
+<pre><code>## [1] 5</code></pre>
+<p>…and room for 95 more:</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb19-1" title="1">buf<span class="op">$</span><span class="kw">free</span>()</a></code></pre></div>
+<pre><code>## [1] 95</code></pre>
+<p>To read the content of the buffer without modifying it, use <code>read(n)</code> where <code>n</code> is the number of elements to read. This <em>always</em> returns a list of length <code>n</code>:</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb21-1" title="1">buf<span class="op">$</span><span class="kw">read</span>(<span class="dv">1</span>)</a></code></pre></div>
+<pre><code>## [[1]]
+## [1] &quot;a&quot;</code></pre>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb23-1" title="1">buf<span class="op">$</span><span class="kw">read</span>(<span class="dv">2</span>)</a></code></pre></div>
+<pre><code>## [[1]]
+## [1] &quot;a&quot;
+## 
+## [[2]]
+## [1] &quot;b&quot;</code></pre>
+<p>If you try to read too far, then the buffer will underflow and you will get an error:</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb25-1" title="1">buf<span class="op">$</span><span class="kw">read</span>(<span class="dv">20</span>)</a></code></pre></div>
+<pre><code>## Error: Buffer underflow (requested 20 elements but 5 available)</code></pre>
+<p>If you just want the the first element, use <code>tail()</code></p>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb27-1" title="1">buf<span class="op">$</span><span class="kw">tail</span>()</a></code></pre></div>
+<pre><code>## [1] &quot;a&quot;</code></pre>
+<p>The tail returns the first element in (so the buffer naturally operates as a first-in-first-out queue).</p>
+<p>You can also read the most recently added element with <code>head()</code></p>
+<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb29-1" title="1">buf<span class="op">$</span><span class="kw">head</span>()</a></code></pre></div>
+<pre><code>## [1] &quot;e&quot;</code></pre>
+<p>And you can offset these by an integer number of steps. So moving one position into the buffer from the tail gets the second element added:</p>
+<div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb31-1" title="1">buf<span class="op">$</span><span class="kw">tail_offset</span>(<span class="dv">1</span>)</a></code></pre></div>
+<pre><code>## [1] &quot;b&quot;</code></pre>
+<p>or moving three elements into the buffer from the head (most recently added element) gets the same bit of data</p>
+<div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb33-1" title="1">buf<span class="op">$</span><span class="kw">head_offset</span>(<span class="dv">3</span>)</a></code></pre></div>
+<pre><code>## [1] &quot;b&quot;</code></pre>
+<p>The above operations are all nondestructive – they leave the buffer unchanged. To consume elements, use <code>take(n)</code> which operates the same way as <code>read</code> but it also moves the buffer <code>tail</code>; it consumes elements leaving space for more.</p>
+<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb35-1" title="1">buf<span class="op">$</span><span class="kw">free</span>()</a></code></pre></div>
+<pre><code>## [1] 95</code></pre>
+<div class="sourceCode" id="cb37"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb37-1" title="1">buf<span class="op">$</span><span class="kw">take</span>(<span class="dv">1</span>)</a></code></pre></div>
+<pre><code>## [[1]]
+## [1] &quot;a&quot;</code></pre>
+<div class="sourceCode" id="cb39"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb39-1" title="1">buf<span class="op">$</span><span class="kw">free</span>()</a></code></pre></div>
+<pre><code>## [1] 96</code></pre>
+<p>Now we have consumed an element the tail has moved along, so <code>tail</code> contains “b” and “a” is removed from the buffer:</p>
+<div class="sourceCode" id="cb41"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb41-1" title="1">buf<span class="op">$</span><span class="kw">tail</span>()</a></code></pre></div>
+<pre><code>## [1] &quot;b&quot;</code></pre>
+<p>To reset the buffer, use <code>reset()</code>. This empties the buffer of all data:</p>
+<div class="sourceCode" id="cb43"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb43-1" title="1">buf<span class="op">$</span><span class="kw">reset</span>()</a>
+<a class="sourceLine" id="cb43-2" title="2">buf<span class="op">$</span><span class="kw">used</span>()</a></code></pre></div>
+<pre><code>## [1] 0</code></pre>
+<div class="sourceCode" id="cb45"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb45-1" title="1">buf<span class="op">$</span><span class="kw">is_empty</span>()</a></code></pre></div>
+<pre><code>## [1] TRUE</code></pre>
+<p>While the ring buffer is fixed in size in typical use, you can grow it explicitly. To add additional space, use the <code>grow</code> method:</p>
+<div class="sourceCode" id="cb47"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb47-1" title="1">buf<span class="op">$</span><span class="kw">size</span>()</a></code></pre></div>
+<pre><code>## [1] 100</code></pre>
+<div class="sourceCode" id="cb49"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb49-1" title="1">buf<span class="op">$</span><span class="kw">grow</span>(<span class="dv">20</span>)</a>
+<a class="sourceLine" id="cb49-2" title="2">buf<span class="op">$</span><span class="kw">size</span>()</a></code></pre></div>
+<pre><code>## [1] 120</code></pre>
+<div id="application-simulation-with-recent-history" class="section level2">
+<h2>Application: simulation with recent history</h2>
+<p>The whole point of the ring buffer though is that we can push things onto it and pull the most recent out, even when the number of things pushed <em>overall</em> is larger than the buffer size.</p>
+<p>So imagine a simulation where we need to keep track of the last 5 steps. The simulation is a random walk.</p>
+<div class="sourceCode" id="cb51"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb51-1" title="1">step &lt;-<span class="st"> </span><span class="cf">function</span>(x) {</a>
+<a class="sourceLine" id="cb51-2" title="2">  <span class="cf">if</span> (<span class="kw">runif</span>(<span class="dv">1</span>) <span class="op">&lt;</span><span class="st"> </span><span class="fl">0.5</span>) x <span class="op">-</span><span class="st"> </span>1L <span class="cf">else</span> x <span class="op">+</span><span class="st"> </span>1L</a>
+<a class="sourceLine" id="cb51-3" title="3">}</a>
+<a class="sourceLine" id="cb51-4" title="4"></a>
+<a class="sourceLine" id="cb51-5" title="5">x &lt;-<span class="st"> </span>0L</a>
+<a class="sourceLine" id="cb51-6" title="6">buf &lt;-<span class="st"> </span>ring<span class="op">::</span><span class="kw">ring_buffer_env</span>(<span class="dv">5</span>)</a>
+<a class="sourceLine" id="cb51-7" title="7">h &lt;-<span class="st"> </span><span class="kw">integer</span>(<span class="dv">20</span>)</a>
+<a class="sourceLine" id="cb51-8" title="8">buf<span class="op">$</span><span class="kw">push</span>(x)</a>
+<a class="sourceLine" id="cb51-9" title="9">h[1L] &lt;-<span class="st"> </span>x</a>
+<a class="sourceLine" id="cb51-10" title="10"></a>
+<a class="sourceLine" id="cb51-11" title="11"><span class="kw">set.seed</span>(<span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb51-12" title="12"><span class="cf">for</span> (i <span class="cf">in</span> <span class="kw">seq_len</span>(<span class="kw">length</span>(h) <span class="op">-</span><span class="st"> </span>1L)) {</a>
+<a class="sourceLine" id="cb51-13" title="13">  x &lt;-<span class="st"> </span><span class="kw">step</span>(x)</a>
+<a class="sourceLine" id="cb51-14" title="14">  buf<span class="op">$</span><span class="kw">push</span>(x)</a>
+<a class="sourceLine" id="cb51-15" title="15">  h[i <span class="op">+</span><span class="st"> </span>1L] &lt;-<span class="st"> </span>x</a>
+<a class="sourceLine" id="cb51-16" title="16">}</a></code></pre></div>
+<p>The whole history:</p>
+<div class="sourceCode" id="cb52"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb52-1" title="1">h</a></code></pre></div>
+<pre><code>##  [1]  0 -1 -2 -1  0 -1  0  1  2  3  2  1  0  1  0  1  0  1  2  1</code></pre>
+<p>The last 5 steps:</p>
+<div class="sourceCode" id="cb54"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb54-1" title="1"><span class="kw">unlist</span>(buf<span class="op">$</span><span class="kw">read</span>(<span class="dv">5</span>))</a></code></pre></div>
+<pre><code>## [1] 1 0 1 2 1</code></pre>
+<p>So we could rewrite the simulation so that the random walk tends up if the last few steps have been increases and tends down if the last few steps have been decreases:</p>
+<div class="sourceCode" id="cb56"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb56-1" title="1">step &lt;-<span class="st"> </span><span class="cf">function</span>(x) {</a>
+<a class="sourceLine" id="cb56-2" title="2">  <span class="cf">if</span> (<span class="kw">length</span>(x) <span class="op">&gt;</span><span class="st"> </span><span class="dv">1</span>) {</a>
+<a class="sourceLine" id="cb56-3" title="3">    p &lt;-<span class="st"> </span><span class="kw">mean</span>(<span class="kw">diff</span>(x)) <span class="op">/</span><span class="st"> </span><span class="dv">2</span> <span class="op">+</span><span class="st"> </span><span class="fl">0.5</span></a>
+<a class="sourceLine" id="cb56-4" title="4">  } <span class="cf">else</span> {</a>
+<a class="sourceLine" id="cb56-5" title="5">    p &lt;-<span class="st"> </span><span class="fl">0.5</span></a>
+<a class="sourceLine" id="cb56-6" title="6">  }</a>
+<a class="sourceLine" id="cb56-7" title="7">  <span class="cf">if</span> (<span class="kw">runif</span>(<span class="dv">1</span>) <span class="op">&lt;</span><span class="st"> </span>p) x[<span class="kw">length</span>(x)] <span class="op">-</span><span class="st"> </span>1L <span class="cf">else</span> x[<span class="kw">length</span>(x)] <span class="op">+</span><span class="st"> </span>1L</a>
+<a class="sourceLine" id="cb56-8" title="8">}</a>
+<a class="sourceLine" id="cb56-9" title="9"></a>
+<a class="sourceLine" id="cb56-10" title="10">x &lt;-<span class="st"> </span>0L</a>
+<a class="sourceLine" id="cb56-11" title="11">buf &lt;-<span class="st"> </span>ring<span class="op">::</span><span class="kw">ring_buffer_env</span>(<span class="dv">5</span>)</a>
+<a class="sourceLine" id="cb56-12" title="12">h &lt;-<span class="st"> </span><span class="kw">integer</span>(<span class="dv">100</span>)</a>
+<a class="sourceLine" id="cb56-13" title="13">buf<span class="op">$</span><span class="kw">push</span>(x)</a>
+<a class="sourceLine" id="cb56-14" title="14">h[1L] &lt;-<span class="st"> </span>x</a>
+<a class="sourceLine" id="cb56-15" title="15"></a>
+<a class="sourceLine" id="cb56-16" title="16"><span class="kw">set.seed</span>(<span class="dv">1</span>)</a>
+<a class="sourceLine" id="cb56-17" title="17"><span class="cf">for</span> (i <span class="cf">in</span> <span class="kw">seq_len</span>(<span class="kw">length</span>(h) <span class="op">-</span><span class="st"> </span>1L)) {</a>
+<a class="sourceLine" id="cb56-18" title="18">  x &lt;-<span class="st"> </span><span class="kw">step</span>(<span class="kw">unlist</span>(buf<span class="op">$</span><span class="kw">read</span>(buf<span class="op">$</span><span class="kw">used</span>())))</a>
+<a class="sourceLine" id="cb56-19" title="19">  buf<span class="op">$</span><span class="kw">push</span>(x)</a>
+<a class="sourceLine" id="cb56-20" title="20">  h[i <span class="op">+</span><span class="st"> </span>1L] &lt;-<span class="st"> </span>x</a>
+<a class="sourceLine" id="cb56-21" title="21">}</a></code></pre></div>
+<p>Now we have a simulation with a strong mean reverting tendency:</p>
+<div class="sourceCode" id="cb57"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb57-1" title="1"><span class="kw">par</span>(<span class="dt">mar =</span> <span class="kw">c</span>(<span class="dv">4</span>, <span class="dv">4</span>, <span class="fl">.5</span>, <span class="fl">.5</span>))</a>
+<a class="sourceLine" id="cb57-2" title="2"><span class="kw">plot</span>(h, <span class="dt">type =</span> <span class="st">&quot;l&quot;</span>, <span class="dt">xlab =</span> <span class="st">&quot;step&quot;</span>, <span class="dt">ylab =</span> <span class="st">&quot;y&quot;</span>, <span class="dt">las =</span> <span class="dv">1</span>)</a></code></pre></div>
+<p><img src="data:image/png;base64,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" /><!-- --></p>
+<p>Because the buffer always holds the last 5 (or fewer) elements the book-keeping involved in working with the last few elements out is simplified. Ignoring the fact that we hold the entire history in the fixed size vector <code>h</code>, only the last few elements need to be retained which may be useful if the simulation generates a lot of data.</p>
+<p>A downside of this implementation is that <code>buf$read()</code> returns a list that must be turned into a vector with <code>unlist</code>, even though we know in this case that the simulation will always produce an integer vector. The ring buffers described below can help with that problem.</p>
+</div>
+</div>
+<div id="the-bytes-buffer-ring_buffer_bytes" class="section level1">
+<h1>The bytes buffer <code>ring_buffer_bytes</code></h1>
+<p>This is the classical implementation of a ring buffer, and the implementation is broadly based on the one <a href="https://github.com/dhess/c-ringbuf">here</a>, by <a href="https://github.com/dhess">@dhess</a>.</p>
+<p>This operates basically the same way as <code>ring_buffer_env</code>, and presents a very similar interface to R, but with a few key differences:</p>
+<ul>
+<li>The contents of the buffer are raw bytes (using R’s raw vectors). These are a bit fiddly to work with but can be very powerful.</li>
+<li>The <code>iterate</code> distinction of <code>push</code> disappears because there is no ambiguity with R objects</li>
+</ul>
+<p>To construct a buffer of 1000 bytes:</p>
+<div class="sourceCode" id="cb58"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb58-1" title="1">buf &lt;-<span class="st"> </span>ring<span class="op">::</span><span class="kw">ring_buffer_bytes</span>(<span class="dv">1000</span>)</a></code></pre></div>
+<p>Most of the same methods apply directly:</p>
+<div class="sourceCode" id="cb59"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb59-1" title="1">buf<span class="op">$</span><span class="kw">free</span>()</a></code></pre></div>
+<pre><code>## [1] 1000</code></pre>
+<div class="sourceCode" id="cb61"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb61-1" title="1">buf<span class="op">$</span><span class="kw">used</span>()</a></code></pre></div>
+<pre><code>## [1] 0</code></pre>
+<div class="sourceCode" id="cb63"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb63-1" title="1">buf<span class="op">$</span><span class="kw">is_full</span>()</a></code></pre></div>
+<pre><code>## [1] FALSE</code></pre>
+<div class="sourceCode" id="cb65"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb65-1" title="1">buf<span class="op">$</span><span class="kw">is_empty</span>()</a></code></pre></div>
+<pre><code>## [1] TRUE</code></pre>
+<p>Generate a byte sequence:</p>
+<div class="sourceCode" id="cb67"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb67-1" title="1">bytes &lt;-<span class="st"> </span><span class="kw">as.raw</span>(<span class="dv">0</span><span class="op">:</span><span class="dv">255</span>)</a></code></pre></div>
+<p>…and push them into the buffer:</p>
+<div class="sourceCode" id="cb68"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb68-1" title="1">buf<span class="op">$</span><span class="kw">push</span>(bytes)</a></code></pre></div>
+<p>…read from the buffer</p>
+<div class="sourceCode" id="cb69"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb69-1" title="1">buf<span class="op">$</span><span class="kw">read</span>(<span class="dv">10</span>)</a></code></pre></div>
+<pre><code>##  [1] 00 01 02 03 04 05 06 07 08 09</code></pre>
+<p>…destructively take the oldest elements</p>
+<div class="sourceCode" id="cb71"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb71-1" title="1">buf<span class="op">$</span><span class="kw">used</span>()</a></code></pre></div>
+<pre><code>## [1] 256</code></pre>
+<div class="sourceCode" id="cb73"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb73-1" title="1">buf<span class="op">$</span><span class="kw">take</span>(<span class="dv">20</span>)</a></code></pre></div>
+<pre><code>##  [1] 00 01 02 03 04 05 06 07 08 09 0a 0b 0c 0d 0e 0f 10 11 12 13</code></pre>
+<div class="sourceCode" id="cb75"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb75-1" title="1">buf<span class="op">$</span><span class="kw">used</span>()</a></code></pre></div>
+<pre><code>## [1] 236</code></pre>
+<div id="striding" class="section level2">
+<h2>Striding</h2>
+<p>Single bytes can hold only values 0 to 255 (or character equivalents, such as <code>a</code> becomes 61 via <code>charToRaw(&quot;a&quot;)</code>. But if you want to hold a full integer, that (usually) takes 4 bytes, a double (usually) takes 8.</p>
+<p>To allow this, a bytes buffer can be “strided”; this indicates the number of consecutive bytes that should together make up one logical entry. The buffer then contains <code>size</code> of these. So to create a buffer of 100 entries, each of <code>8</code> bytes you could do:</p>
+<div class="sourceCode" id="cb77"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb77-1" title="1">buf &lt;-<span class="st"> </span>ring<span class="op">::</span><span class="kw">ring_buffer_bytes</span>(<span class="dv">100</span>, <span class="dv">8</span>)</a></code></pre></div>
+<p>Each element pushed onto the buffer must have the correct size. So to push the byte sequence 1..8 onto the buffer:</p>
+<div class="sourceCode" id="cb78"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb78-1" title="1">buf<span class="op">$</span><span class="kw">push</span>(<span class="kw">as.raw</span>(<span class="dv">1</span><span class="op">:</span><span class="dv">8</span>))</a></code></pre></div>
+<p>but if you pushed more or less it would be an error:</p>
+<div class="sourceCode" id="cb79"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb79-1" title="1">buf<span class="op">$</span><span class="kw">push</span>(<span class="kw">as.raw</span>(<span class="dv">1</span><span class="op">:</span><span class="dv">4</span>))</a></code></pre></div>
+<pre><code>## Error in buf$push(as.raw(1:4)): Incorrect size data; expected multiple of 8 bytes</code></pre>
+<p>Reading happens in <em>logical</em> units, not bytes:</p>
+<div class="sourceCode" id="cb81"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb81-1" title="1">buf<span class="op">$</span><span class="kw">read</span>(<span class="dv">1</span>)</a></code></pre></div>
+<pre><code>## [1] 01 02 03 04 05 06 07 08</code></pre>
+<p>and you can get the number of elements used:</p>
+<div class="sourceCode" id="cb83"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb83-1" title="1">buf<span class="op">$</span><span class="kw">used</span>()</a></code></pre></div>
+<pre><code>## [1] 1</code></pre>
+<p>or the number of bytes</p>
+<div class="sourceCode" id="cb85"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb85-1" title="1">buf<span class="op">$</span><span class="kw">used</span>(<span class="dt">bytes =</span> <span class="ot">TRUE</span>)</a></code></pre></div>
+<pre><code>## [1] 8</code></pre>
+</div>
+<div id="the-typed-bytes-buffer-ring_buffer_bytes_typed" class="section level2">
+<h2>The typed bytes buffer <code>ring_buffer_bytes_typed</code></h2>
+<p>If 8 bytes is a double, it should be possible to make a bytes buffer that holds one (or more) doubles per entry. That is what the <code>ring_buffer_bytes_typed</code> buffer does, with a few corner cases dealt with. To use, you decide what the <em>R interpretation</em> of an entry is, it will determine the size per entry and appropriate encoding and decoding functions and you can ignore that it is storing bytes. For performance reasons this does not use R’s serialisation and simply copies the data stored in vectors.</p>
+<p>For example, to make a buffer of 10 elements, each of which is a single real number (double), use:</p>
+<div class="sourceCode" id="cb87"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb87-1" title="1">buf &lt;-<span class="st"> </span>ring<span class="op">::</span><span class="kw">ring_buffer_bytes_typed</span>(<span class="dv">10</span>, <span class="kw">double</span>(<span class="dv">1</span>))</a></code></pre></div>
+<p>onto which real numbers can be pushed:</p>
+<div class="sourceCode" id="cb88"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb88-1" title="1">buf<span class="op">$</span><span class="kw">push</span>(pi)</a></code></pre></div>
+<p>And retrieve the data.</p>
+<div class="sourceCode" id="cb89"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb89-1" title="1">buf<span class="op">$</span><span class="kw">take</span>(<span class="dv">1</span>)</a></code></pre></div>
+<pre><code>## [1] 3.141593</code></pre>
+<p>Entries can contain more than one number; to make a buffer of length 10, each element of which is a vector of 5 doubles:</p>
+<div class="sourceCode" id="cb91"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb91-1" title="1">buf &lt;-<span class="st"> </span>ring<span class="op">::</span><span class="kw">ring_buffer_bytes_typed</span>(<span class="dv">10</span>, <span class="kw">double</span>(<span class="dv">5</span>))</a>
+<a class="sourceLine" id="cb91-2" title="2">buf<span class="op">$</span><span class="kw">push</span>(<span class="kw">rnorm</span>(<span class="dv">5</span>))</a>
+<a class="sourceLine" id="cb91-3" title="3">buf<span class="op">$</span><span class="kw">read</span>(<span class="dv">1</span>)</a></code></pre></div>
+<pre><code>## [1]  0.26613736 -0.37670272  2.44136463 -0.79533912 -0.05487747</code></pre>
+<p>Because this is just implemented as a byte array, we can just push a bunch of numbers straight into the buffer:</p>
+<div class="sourceCode" id="cb93"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb93-1" title="1">buf<span class="op">$</span><span class="kw">push</span>(<span class="kw">rnorm</span>(<span class="dv">5</span> <span class="op">*</span><span class="st"> </span><span class="dv">10</span>))</a></code></pre></div>
+<p>With elements in the buffer, we can request them. The integer argument of <code>take</code> indicates the number of groups of 5 doubles we would like back:</p>
+<div class="sourceCode" id="cb94"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb94-1" title="1">buf<span class="op">$</span><span class="kw">take</span>(<span class="dv">1</span>)</a></code></pre></div>
+<pre><code>## [1]  0.2501413  0.6182433 -0.1726235 -2.2239003 -1.2636144</code></pre>
+<p>If you try to take more than is in the buffer it is an error:</p>
+<div class="sourceCode" id="cb96"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb96-1" title="1">buf<span class="op">$</span><span class="kw">take</span>(<span class="dv">10</span>)</a></code></pre></div>
+<pre><code>## Error in super$take(n): Buffer underflow (requested 10 elements but 9 available)</code></pre>
+</div>
+<div id="the-translating-bytes-buffer-ring_buffer_bytes_translate" class="section level2">
+<h2>The translating bytes buffer <code>ring_buffer_bytes_translate</code></h2>
+<p>The <code>ring_buffer_bytes_typed</code> function is implemented by translating R objects to bytes (when storing with <code>$set()</code>, <code>$push()</code>, etc). and from bytes back to R objects (when retrieving with <code>$read()</code>, <code>$take()</code>, etc). <code>ring_buffer_bytes_translate</code> exposes this interface.</p>
+<p>The “typed” buffers do not allow storing strings because they can be any number of bytes long (the bytes buffers require a fixed “stride” within a buffer). But we can store fixed length strings.</p>
+<p>To convert a string to a byte sequence, use <code>charToRaw</code> (or <code>as.raw(utf8ToInt(x))</code>, but then multi-byte sequences might start being difficult).</p>
+<div class="sourceCode" id="cb98"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb98-1" title="1">(bytes &lt;-<span class="st"> </span><span class="kw">charToRaw</span>(<span class="st">&quot;hello world&quot;</span>))</a></code></pre></div>
+<pre><code>##  [1] 68 65 6c 6c 6f 20 77 6f 72 6c 64</code></pre>
+<p>The inverse transformation is <code>rawToChar</code> (or <code>intToUtf8(as.integer(x))</code>):</p>
+<div class="sourceCode" id="cb100"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb100-1" title="1"><span class="kw">rawToChar</span>(bytes)</a></code></pre></div>
+<pre><code>## [1] &quot;hello world&quot;</code></pre>
+<p>The function <code>ring_buffer_bytes_translate</code> takes these functions as its 3rd and fourth arguments. So to make a buffer that will hold up to 100 strings, each of 8 bytes:</p>
+<div class="sourceCode" id="cb102"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb102-1" title="1">b &lt;-<span class="st"> </span>ring<span class="op">::</span><span class="kw">ring_buffer_bytes_translate</span>(<span class="dv">100</span>, <span class="dv">8</span>, charToRaw, rawToChar)</a></code></pre></div>
+<p>We can now store 8 character strings:</p>
+<div class="sourceCode" id="cb103"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb103-1" title="1">b<span class="op">$</span><span class="kw">push</span>(<span class="st">&quot;abcdefgh&quot;</span>)</a>
+<a class="sourceLine" id="cb103-2" title="2">b<span class="op">$</span><span class="kw">tail</span>()</a></code></pre></div>
+<pre><code>## [1] &quot;abcdefgh&quot;</code></pre>
+<p>But other length strings cannot be added:</p>
+<div class="sourceCode" id="cb105"><pre class="sourceCode r"><code class="sourceCode r"><a class="sourceLine" id="cb105-1" title="1">b<span class="op">$</span><span class="kw">push</span>(<span class="st">&quot;hello!&quot;</span>)</a></code></pre></div>
+<pre><code>## Error in super$push(self$.to(data)): Incorrect size data; expected multiple of 8 bytes</code></pre>
+<p>Probably this would be most useful storing just single characters as then it would make a buffer of <em>text</em>.</p>
+</div>
+</div>
+<div id="the-c-api" class="section level1">
+<h1>The C API</h1>
+<p>The <code>ring</code> package can be used in other R packages using the <code>LinkingTo</code> mechanism. To do so:</p>
+<ul>
+<li><p>In your <code>DESCRIPTION</code>, add a line <code>LinkingTo: ring</code> (you do not need to include <code>ring</code> in <code>Depends</code> or <code>Imports</code> as we need it only for the package build).</p></li>
+<li><p>In your <code>src/</code> directory, add a file <code>ring.c</code> containing just the line <code>#include &lt;ring/ring.c&gt;</code> (but see the note in the documentation for <code>ring_buffer_create</code> below).</p></li>
+<li><p>Anywhere in your code you want to use the ring buffer, include the line <code>#include &lt;dde/dde.h&gt;</code> to include the prototypes and use the interface as described below.</p></li>
+</ul>
+<p>(I am not sure what the best practice way of doing this with a standalone shared library compiled with <code>R CMD SHLIB</code> is though; probably best to make a package.)</p>
+<p>The C API is documented only in the header file, and it should be fairly straightforward to use (with reference to the docs above; this is the code underlying the <code>ring_buffer_bytes</code> interface).</p>
+<div class="sourceCode" id="cb107"><pre class="sourceCode c"><code class="sourceCode c"><a class="sourceLine" id="cb107-1" title="1"><span class="pp">#ifndef _RING_H_</span></a>
+<a class="sourceLine" id="cb107-2" title="2"><span class="pp">#define _RING_H_</span></a>
+<a class="sourceLine" id="cb107-3" title="3"><span class="pp">#include </span><span class="im">&lt;stddef.h&gt;</span></a>
+<a class="sourceLine" id="cb107-4" title="4"><span class="pp">#include </span><span class="im">&lt;stdbool.h&gt;</span></a>
+<a class="sourceLine" id="cb107-5" title="5"></a>
+<a class="sourceLine" id="cb107-6" title="6"><span class="pp">#ifndef RING_USE_STDLIB_ALLOC</span></a>
+<a class="sourceLine" id="cb107-7" title="7"><span class="pp">#ifndef USING_R</span></a>
+<a class="sourceLine" id="cb107-8" title="8"><span class="pp">#define USING_R</span></a>
+<a class="sourceLine" id="cb107-9" title="9"><span class="pp">#endif</span></a>
+<a class="sourceLine" id="cb107-10" title="10"><span class="pp">#endif</span></a>
+<a class="sourceLine" id="cb107-11" title="11"></a>
+<a class="sourceLine" id="cb107-12" title="12"><span class="co">// Allow use from C++</span></a>
+<a class="sourceLine" id="cb107-13" title="13"><span class="pp">#ifdef __cplusplus</span></a>
+<a class="sourceLine" id="cb107-14" title="14"><span class="kw">extern</span> <span class="st">&quot;C&quot;</span> {</a>
+<a class="sourceLine" id="cb107-15" title="15"><span class="pp">#endif</span></a>
+<a class="sourceLine" id="cb107-16" title="16"></a>
+<a class="sourceLine" id="cb107-17" title="17"><span class="co">// What to do on overflow.</span></a>
+<a class="sourceLine" id="cb107-18" title="18"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-19" title="19"><span class="co">// The OVERFLOW_ERROR action (which calls R&#39;s error function) is only</span></a>
+<a class="sourceLine" id="cb107-20" title="20"><span class="co">// available when using R, which is detected by the &lt;R.h&gt; header</span></a>
+<a class="sourceLine" id="cb107-21" title="21"><span class="co">// included.  If you are using RING_USE_STDLIB_ALLOC (see below) but</span></a>
+<a class="sourceLine" id="cb107-22" title="22"><span class="co">// want to use OVERFLOW_ERROR then you&#39;ll need to include &lt;R.h&gt; as</span></a>
+<a class="sourceLine" id="cb107-23" title="23"><span class="co">// well, and be willing to deal with an R error and the longjmp that</span></a>
+<a class="sourceLine" id="cb107-24" title="24"><span class="co">// it causes.</span></a>
+<a class="sourceLine" id="cb107-25" title="25"><span class="kw">typedef</span> <span class="kw">enum</span> overflow_action {</a>
+<a class="sourceLine" id="cb107-26" title="26">  OVERFLOW_OVERWRITE,</a>
+<a class="sourceLine" id="cb107-27" title="27">  OVERFLOW_GROW</a>
+<a class="sourceLine" id="cb107-28" title="28"><span class="pp">#ifdef USING_R</span></a>
+<a class="sourceLine" id="cb107-29" title="29">  , OVERFLOW_ERROR</a>
+<a class="sourceLine" id="cb107-30" title="30"><span class="pp">#endif</span></a>
+<a class="sourceLine" id="cb107-31" title="31">} overflow_action;</a>
+<a class="sourceLine" id="cb107-32" title="32"></a>
+<a class="sourceLine" id="cb107-33" title="33"><span class="co">// The underlying data structure.  None of the fields here should be</span></a>
+<a class="sourceLine" id="cb107-34" title="34"><span class="co">// directly accessed in normal use; use the accessor functions</span></a>
+<a class="sourceLine" id="cb107-35" title="35"><span class="co">// instead.</span></a>
+<a class="sourceLine" id="cb107-36" title="36"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-37" title="37"><span class="co">// The ring buffer is a FIFO (first-in-first-out) queue.  It is</span></a>
+<a class="sourceLine" id="cb107-38" title="38"><span class="co">// implemented as a single block of memory (data) and a pair of</span></a>
+<a class="sourceLine" id="cb107-39" title="39"><span class="co">// pointers:</span></a>
+<a class="sourceLine" id="cb107-40" title="40"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-41" title="41"><span class="co">//   head: the starting location where data should be written when</span></a>
+<a class="sourceLine" id="cb107-42" title="42"><span class="co">//         copying data *into* the buffer.</span></a>
+<a class="sourceLine" id="cb107-43" title="43"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-44" title="44"><span class="co">//   tail: the starting location where data should be read when</span></a>
+<a class="sourceLine" id="cb107-45" title="45"><span class="co">//         copying data *from* the buffer.</span></a>
+<a class="sourceLine" id="cb107-46" title="46"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-47" title="47"><span class="co">// The buffer has a concept of a stride; the number of bytes per</span></a>
+<a class="sourceLine" id="cb107-48" title="48"><span class="co">// buffer entry.  This is fixed across the entire ring.  As such, some</span></a>
+<a class="sourceLine" id="cb107-49" title="49"><span class="co">// functions that return size_t have a booleanargument &quot;bytes&quot; that</span></a>
+<a class="sourceLine" id="cb107-50" title="50"><span class="co">// switches between measuring in bytes and measuring in logical</span></a>
+<a class="sourceLine" id="cb107-51" title="51"><span class="co">// elements.  In the case where stride=1, these are identical.</span></a>
+<a class="sourceLine" id="cb107-52" title="52"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-53" title="53"><span class="co">// In general, the ring buffer is totally happy to overflow; if you</span></a>
+<a class="sourceLine" id="cb107-54" title="54"><span class="co">// write too much into the ring buffer it will destructively erase</span></a>
+<a class="sourceLine" id="cb107-55" title="55"><span class="co">// data (i.e., your tail will move).  The ring buffer will never</span></a>
+<a class="sourceLine" id="cb107-56" title="56"><span class="co">// underflow, but functions may return `NULL` on underflow - read the</span></a>
+<a class="sourceLine" id="cb107-57" title="57"><span class="co">// documentation below carefully.</span></a>
+<a class="sourceLine" id="cb107-58" title="58"><span class="kw">typedef</span> <span class="dt">unsigned</span> <span class="dt">char</span> data_t;</a>
+<a class="sourceLine" id="cb107-59" title="59"><span class="kw">typedef</span> <span class="kw">struct</span> ring_buffer {</a>
+<a class="sourceLine" id="cb107-60" title="60">  <span class="dt">size_t</span> size;</a>
+<a class="sourceLine" id="cb107-61" title="61">  <span class="dt">size_t</span> stride;</a>
+<a class="sourceLine" id="cb107-62" title="62">  <span class="dt">size_t</span> bytes_data;</a>
+<a class="sourceLine" id="cb107-63" title="63">  overflow_action on_overflow;</a>
+<a class="sourceLine" id="cb107-64" title="64"></a>
+<a class="sourceLine" id="cb107-65" title="65">  data_t *data;</a>
+<a class="sourceLine" id="cb107-66" title="66">  data_t *head;</a>
+<a class="sourceLine" id="cb107-67" title="67">  data_t *tail;</a>
+<a class="sourceLine" id="cb107-68" title="68">} ring_buffer;</a>
+<a class="sourceLine" id="cb107-69" title="69"></a>
+<a class="sourceLine" id="cb107-70" title="70"><span class="co">//// Creation, deletion, etc: ////</span></a>
+<a class="sourceLine" id="cb107-71" title="71"></a>
+<a class="sourceLine" id="cb107-72" title="72"><span class="co">// Create a ring buffer.  After creating, be sure to free the memory</span></a>
+<a class="sourceLine" id="cb107-73" title="73"><span class="co">// with `ring_buffer_destroy`.</span></a>
+<a class="sourceLine" id="cb107-74" title="74"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-75" title="75"><span class="co">//   size: (maximum) number of elements that the ring buffer may contain</span></a>
+<a class="sourceLine" id="cb107-76" title="76"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-77" title="77"><span class="co">//   stride: number of *bytes* per ring buffer element</span></a>
+<a class="sourceLine" id="cb107-78" title="78"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-79" title="79"><span class="co">// See the note above the struct for details on size/stride.</span></a>
+<a class="sourceLine" id="cb107-80" title="80"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-81" title="81"><span class="co">// If the buffer cannot be allocated (e.g., too big a buffer is</span></a>
+<a class="sourceLine" id="cb107-82" title="82"><span class="co">// requested) then an R error will be thrown as this uses `Calloc`.</span></a>
+<a class="sourceLine" id="cb107-83" title="83"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-84" title="84"><span class="co">// This may not always be desirable (e.g., if using from within C++,</span></a>
+<a class="sourceLine" id="cb107-85" title="85"><span class="co">// or in a project that does not actually use R).  To use plain C</span></a>
+<a class="sourceLine" id="cb107-86" title="86"><span class="co">// stdlib calloc/free, in the ring.c use:</span></a>
+<a class="sourceLine" id="cb107-87" title="87"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-88" title="88"><span class="co">//     #define RING_USE_STDLIB_ALLOC 1</span></a>
+<a class="sourceLine" id="cb107-89" title="89"><span class="co">//     #include &lt;ring/ring.c&gt;</span></a>
+<a class="sourceLine" id="cb107-90" title="90"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-91" title="91"><span class="co">// which will not depend on *any* R code and use stdlib calloc/free</span></a>
+<a class="sourceLine" id="cb107-92" title="92"><span class="co">// (except for the issue with USING_R/OVERFLOW_ERROR above).  With</span></a>
+<a class="sourceLine" id="cb107-93" title="93"><span class="co">// RING_USE_STDLIB_ALLOC defined, if an allocation fails, then</span></a>
+<a class="sourceLine" id="cb107-94" title="94"><span class="co">// ring_buffer_create (and ring_buffer_duplicate below) will return</span></a>
+<a class="sourceLine" id="cb107-95" title="95"><span class="co">// NULL.  So if using this approach be sure to check the return value!</span></a>
+<a class="sourceLine" id="cb107-96" title="96"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-97" title="97"><span class="co">// The main wrinkle to using RING_USE_STDLIB_ALLOC 1 is that the</span></a>
+<a class="sourceLine" id="cb107-98" title="98"><span class="co">// `overflow_action` `OVERFLOW_ERROR` will not work.  At present this</span></a>
+<a class="sourceLine" id="cb107-99" title="99"><span class="co">// will fail to compile, but in future I may add an error handler.</span></a>
+<a class="sourceLine" id="cb107-100" title="100">ring_buffer * ring_buffer_create(<span class="dt">size_t</span> size, <span class="dt">size_t</span> stride,</a>
+<a class="sourceLine" id="cb107-101" title="101">                                 overflow_action on_overflow);</a>
+<a class="sourceLine" id="cb107-102" title="102"></a>
+<a class="sourceLine" id="cb107-103" title="103"><span class="co">// Destroy a ring buffer.  Frees the memory</span></a>
+<a class="sourceLine" id="cb107-104" title="104"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-105" title="105"><span class="co">//   buffer: the ring buffer to copy; after calling this function all</span></a>
+<a class="sourceLine" id="cb107-106" title="106"><span class="co">//           memory associated with the buffer is freed.</span></a>
+<a class="sourceLine" id="cb107-107" title="107"><span class="dt">void</span> ring_buffer_destroy(ring_buffer *buffer);</a>
+<a class="sourceLine" id="cb107-108" title="108"></a>
+<a class="sourceLine" id="cb107-109" title="109"><span class="co">// Duplicate (copy) a ring buffer.  Copies both the underlying data and</span></a>
+<a class="sourceLine" id="cb107-110" title="110"><span class="co">// the position of the head and tail.  A new buffer will be allocated</span></a>
+<a class="sourceLine" id="cb107-111" title="111"><span class="co">// and must be freed when finished with, using `ring_buffer_destroy`</span></a>
+<a class="sourceLine" id="cb107-112" title="112"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-113" title="113"><span class="co">//   buffer: a ring buffer to copy from; will not be modified</span></a>
+<a class="sourceLine" id="cb107-114" title="114">ring_buffer * ring_buffer_duplicate(<span class="dt">const</span> ring_buffer *buffer);</a>
+<a class="sourceLine" id="cb107-115" title="115"></a>
+<a class="sourceLine" id="cb107-116" title="116"><span class="co">// Increase the size of the ring buffer so that it can hold additional</span></a>
+<a class="sourceLine" id="cb107-117" title="117"><span class="co">// elements.  This does not alter existing elements but increases the</span></a>
+<a class="sourceLine" id="cb107-118" title="118"><span class="co">// capacity (similar to he `reserve` method in the C++ standard</span></a>
+<a class="sourceLine" id="cb107-119" title="119"><span class="co">// library).</span></a>
+<a class="sourceLine" id="cb107-120" title="120"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-121" title="121"><span class="co">//   buffer: a ring buffer to increase the size of</span></a>
+<a class="sourceLine" id="cb107-122" title="122"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-123" title="123"><span class="co">//   n: the number of elements to increase the buffer by</span></a>
+<a class="sourceLine" id="cb107-124" title="124"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-125" title="125"><span class="co">//   exact: boolean, indicating if the buffer should be increased by</span></a>
+<a class="sourceLine" id="cb107-126" title="126"><span class="co">//          exactly `n` elements (if true) or by at least `n` elements</span></a>
+<a class="sourceLine" id="cb107-127" title="127"><span class="co">//          (if false).  If using the inexact method, the buffer is</span></a>
+<a class="sourceLine" id="cb107-128" title="128"><span class="co">//          increased in size using geometric growth using the golden</span></a>
+<a class="sourceLine" id="cb107-129" title="129"><span class="co">//          ratio.</span></a>
+<a class="sourceLine" id="cb107-130" title="130"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-131" title="131"><span class="co">// After using this function, all references to the head or tail are</span></a>
+<a class="sourceLine" id="cb107-132" title="132"><span class="co">// broken and the memory may have been freed and the contents moved</span></a>
+<a class="sourceLine" id="cb107-133" title="133"><span class="co">// elsewhere.</span></a>
+<a class="sourceLine" id="cb107-134" title="134"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-135" title="135"><span class="co">// If RING_USE_STDLIB_ALLOC is defined, and if an allocation fails,</span></a>
+<a class="sourceLine" id="cb107-136" title="136"><span class="co">// then this may leave things in an undesirable state (this is</span></a>
+<a class="sourceLine" id="cb107-137" title="137"><span class="co">// particularly a problem when using on_overflow = OVERFLOW_GROW).</span></a>
+<a class="sourceLine" id="cb107-138" title="138"><span class="co">// Currently, if R is used an R error will be thrown (possibly not a</span></a>
+<a class="sourceLine" id="cb107-139" title="139"><span class="co">// good idea if running under Rcpp) and if running as a standalone</span></a>
+<a class="sourceLine" id="cb107-140" title="140"><span class="co">// application then the data will be set to NULL, probably causing a</span></a>
+<a class="sourceLine" id="cb107-141" title="141"><span class="co">// crash pretty quickly (improvements welcome).</span></a>
+<a class="sourceLine" id="cb107-142" title="142"><span class="dt">void</span> ring_buffer_grow(ring_buffer *buffer, <span class="dt">size_t</span> n, <span class="dt">bool</span> exact);</a>
+<a class="sourceLine" id="cb107-143" title="143"></a>
+<a class="sourceLine" id="cb107-144" title="144"><span class="co">// Reset the state of the buffer.  This &quot;zeros&quot; the head and tail</span></a>
+<a class="sourceLine" id="cb107-145" title="145"><span class="co">// pointer (and may or may not actually reset the data) so that the</span></a>
+<a class="sourceLine" id="cb107-146" title="146"><span class="co">// buffer can be used as if fresh.</span></a>
+<a class="sourceLine" id="cb107-147" title="147"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-148" title="148"><span class="co">//   buffer: a ring buffer to reset</span></a>
+<a class="sourceLine" id="cb107-149" title="149"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-150" title="150"><span class="co">//   clear: boolean, indicating if memory should also be zeroed</span></a>
+<a class="sourceLine" id="cb107-151" title="151"><span class="dt">void</span> ring_buffer_reset(ring_buffer *buffer, <span class="dt">bool</span> clear);</a>
+<a class="sourceLine" id="cb107-152" title="152"></a>
+<a class="sourceLine" id="cb107-153" title="153"><span class="co">//// Basic querying: ////</span></a>
+<a class="sourceLine" id="cb107-154" title="154"></a>
+<a class="sourceLine" id="cb107-155" title="155"><span class="co">// Return the maximum size of the ring buffer</span></a>
+<a class="sourceLine" id="cb107-156" title="156"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-157" title="157"><span class="co">//   buffer: the ring buffer to test (will not be modified)</span></a>
+<a class="sourceLine" id="cb107-158" title="158"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-159" title="159"><span class="co">//   bytes: indicates if size should be in bytes (if true) or elements</span></a>
+<a class="sourceLine" id="cb107-160" title="160"><span class="co">//          (if false)</span></a>
+<a class="sourceLine" id="cb107-161" title="161"><span class="dt">size_t</span> ring_buffer_size(<span class="dt">const</span> ring_buffer *buffer, <span class="dt">bool</span> bytes);</a>
+<a class="sourceLine" id="cb107-162" title="162"></a>
+<a class="sourceLine" id="cb107-163" title="163"><span class="co">// Report the free and used space in the ring buffer</span></a>
+<a class="sourceLine" id="cb107-164" title="164"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-165" title="165"><span class="co">//   buffer: the ring buffer to test (will not be modified)</span></a>
+<a class="sourceLine" id="cb107-166" title="166"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-167" title="167"><span class="co">//   bytes: indicates if used/free space should be in bytes (if true)</span></a>
+<a class="sourceLine" id="cb107-168" title="168"><span class="co">//          or elements (if false)</span></a>
+<a class="sourceLine" id="cb107-169" title="169"><span class="dt">size_t</span> ring_buffer_free(<span class="dt">const</span> ring_buffer *buffer, <span class="dt">bool</span> bytes);</a>
+<a class="sourceLine" id="cb107-170" title="170"><span class="dt">size_t</span> ring_buffer_used(<span class="dt">const</span> ring_buffer *buffer, <span class="dt">bool</span> bytes);</a>
+<a class="sourceLine" id="cb107-171" title="171"></a>
+<a class="sourceLine" id="cb107-172" title="172"><span class="co">// Report the number of bytes of data that have been allocated.  Note</span></a>
+<a class="sourceLine" id="cb107-173" title="173"><span class="co">// that this is likely `stride` more bytes than was requested as this</span></a>
+<a class="sourceLine" id="cb107-174" title="174"><span class="co">// avoids a lot of awkward bookkeeping later, allowing the &quot;full&quot;</span></a>
+<a class="sourceLine" id="cb107-175" title="175"><span class="co">// state to be distinguished from the &quot;empty&quot; state.</span></a>
+<a class="sourceLine" id="cb107-176" title="176"><span class="dt">size_t</span> ring_buffer_bytes_data(<span class="dt">const</span> ring_buffer *buffer);</a>
+<a class="sourceLine" id="cb107-177" title="177"></a>
+<a class="sourceLine" id="cb107-178" title="178"><span class="co">// Report if the ring buffer is full or empty</span></a>
+<a class="sourceLine" id="cb107-179" title="179"><span class="dt">bool</span> ring_buffer_is_full(<span class="dt">const</span> ring_buffer *buffer);</a>
+<a class="sourceLine" id="cb107-180" title="180"><span class="dt">bool</span> ring_buffer_is_empty(<span class="dt">const</span> ring_buffer *buffer);</a>
+<a class="sourceLine" id="cb107-181" title="181"></a>
+<a class="sourceLine" id="cb107-182" title="182"><span class="co">//// Additional querying: ////</span></a>
+<a class="sourceLine" id="cb107-183" title="183"></a>
+<a class="sourceLine" id="cb107-184" title="184"><span class="co">// Return the position of the head and tail pointers relative to the</span></a>
+<a class="sourceLine" id="cb107-185" title="185"><span class="co">// data pointer (this is an offset, so 0 means the pointer is at the</span></a>
+<a class="sourceLine" id="cb107-186" title="186"><span class="co">// start of the data array).</span></a>
+<a class="sourceLine" id="cb107-187" title="187"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-188" title="188"><span class="co">//   bytes: indicates if offset should be bytes (if true) or elements (if false)</span></a>
+<a class="sourceLine" id="cb107-189" title="189"><span class="dt">size_t</span> ring_buffer_head_pos(<span class="dt">const</span> ring_buffer *buffer, <span class="dt">bool</span> bytes);</a>
+<a class="sourceLine" id="cb107-190" title="190"><span class="dt">size_t</span> ring_buffer_tail_pos(<span class="dt">const</span> ring_buffer *buffer, <span class="dt">bool</span> bytes);</a>
+<a class="sourceLine" id="cb107-191" title="191"></a>
+<a class="sourceLine" id="cb107-192" title="192"><span class="co">// Return pointers to the the data, head and tail members of the ring</span></a>
+<a class="sourceLine" id="cb107-193" title="193"><span class="co">// buffer.  These are preferred over directly accessing the &quot;data&quot;,</span></a>
+<a class="sourceLine" id="cb107-194" title="194"><span class="co">// &quot;head&quot; and &quot;tail&quot; elements of the ring buffer structure itself</span></a>
+<a class="sourceLine" id="cb107-195" title="195"><span class="co">// because with these the compiler will enforce read-only access for</span></a>
+<a class="sourceLine" id="cb107-196" title="196"><span class="co">// you.</span></a>
+<a class="sourceLine" id="cb107-197" title="197"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-198" title="198"><span class="co">// </span><span class="al">WARNING</span><span class="co">: the head buffer is *not* the most recently added element,</span></a>
+<a class="sourceLine" id="cb107-199" title="199"><span class="co">// but instead the bit of memory that will be written to next; it&#39;s</span></a>
+<a class="sourceLine" id="cb107-200" title="200"><span class="co">// generally not terribly useful and a better way of getting the last</span></a>
+<a class="sourceLine" id="cb107-201" title="201"><span class="co">// written element is to use:</span></a>
+<a class="sourceLine" id="cb107-202" title="202"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-203" title="203"><span class="co">//   ring_buffer_head_offset(buffer, 0);</span></a>
+<a class="sourceLine" id="cb107-204" title="204"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-205" title="205"><span class="co">// which will look after wrapping the ring buffer appropriately.</span></a>
+<a class="sourceLine" id="cb107-206" title="206"><span class="dt">const</span> <span class="dt">void</span> * ring_buffer_data(<span class="dt">const</span> ring_buffer *buffer);</a>
+<a class="sourceLine" id="cb107-207" title="207"><span class="dt">const</span> <span class="dt">void</span> * ring_buffer_head(<span class="dt">const</span> ring_buffer *buffer);</a>
+<a class="sourceLine" id="cb107-208" title="208"><span class="dt">const</span> <span class="dt">void</span> * ring_buffer_tail(<span class="dt">const</span> ring_buffer *buffer);</a>
+<a class="sourceLine" id="cb107-209" title="209"></a>
+<a class="sourceLine" id="cb107-210" title="210"><span class="co">//// Setting repeated values: ////</span></a>
+<a class="sourceLine" id="cb107-211" title="211"></a>
+<a class="sourceLine" id="cb107-212" title="212"><span class="co">// Set all bytes of a length of the buffer to &#39;c&#39;.  Here, &#39;len&#39; is the</span></a>
+<a class="sourceLine" id="cb107-213" title="213"><span class="co">// number of *entries*, so stride * len bytes will be set.  This will</span></a>
+<a class="sourceLine" id="cb107-214" title="214"><span class="co">// mostly be uesful with c=0.</span></a>
+<a class="sourceLine" id="cb107-215" title="215"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-216" title="216"><span class="co">//   buffer: the ring buffer to set data into</span></a>
+<a class="sourceLine" id="cb107-217" title="217"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-218" title="218"><span class="co">//   c: value (0-255) to set all bytes to</span></a>
+<a class="sourceLine" id="cb107-219" title="219"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-220" title="220"><span class="co">//   n: number of elements to set</span></a>
+<a class="sourceLine" id="cb107-221" title="221"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-222" title="222"><span class="co">// This starts adding data at `head`.  If the buffer will overflow, at</span></a>
+<a class="sourceLine" id="cb107-223" title="223"><span class="co">// most `bytes_data` bytes will be written (i.e., each element will be</span></a>
+<a class="sourceLine" id="cb107-224" title="224"><span class="co">// written to once).</span></a>
+<a class="sourceLine" id="cb107-225" title="225"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-226" title="226"><span class="co">// Returns the number of bytes actually written to the buffer (so if</span></a>
+<a class="sourceLine" id="cb107-227" title="227"><span class="co">// the buffer overflows this may be less than `len`).</span></a>
+<a class="sourceLine" id="cb107-228" title="228"><span class="dt">size_t</span> ring_buffer_set(ring_buffer *buffer, data_t c, <span class="dt">size_t</span> n);</a>
+<a class="sourceLine" id="cb107-229" title="229"></a>
+<a class="sourceLine" id="cb107-230" title="230"><span class="co">// Set a number of the elements of the buffer to a particular byte</span></a>
+<a class="sourceLine" id="cb107-231" title="231"><span class="co">// pattern.  In contrast with `ring_buffer_set`, this does not set</span></a>
+<a class="sourceLine" id="cb107-232" title="232"><span class="co">// individual bytes, but instead complete elements.</span></a>
+<a class="sourceLine" id="cb107-233" title="233"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-234" title="234"><span class="co">//    buffer: the ring buffer to set data into</span></a>
+<a class="sourceLine" id="cb107-235" title="235"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-236" title="236"><span class="co">//    x: pointer to a set of data to copy into the ring buffer.  This</span></a>
+<a class="sourceLine" id="cb107-237" title="237"><span class="co">//            must be (at least) stride bytes long.</span></a>
+<a class="sourceLine" id="cb107-238" title="238"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-239" title="239"><span class="co">//    n: number of elements to set</span></a>
+<a class="sourceLine" id="cb107-240" title="240"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-241" title="241"><span class="co">// This starts adding data at `head`.  If the buffer will overflow, at</span></a>
+<a class="sourceLine" id="cb107-242" title="242"><span class="co">// most `bytes_data` bytes will be written (i.e., each element will be</span></a>
+<a class="sourceLine" id="cb107-243" title="243"><span class="co">// written to once).</span></a>
+<a class="sourceLine" id="cb107-244" title="244"><span class="dt">size_t</span> ring_buffer_set_stride(ring_buffer *buffer, <span class="dt">const</span> <span class="dt">void</span> *x, <span class="dt">size_t</span> n);</a>
+<a class="sourceLine" id="cb107-245" title="245"></a>
+<a class="sourceLine" id="cb107-246" title="246"><span class="co">//// Read and write ////</span></a>
+<a class="sourceLine" id="cb107-247" title="247"></a>
+<a class="sourceLine" id="cb107-248" title="248"><span class="co">// Copy `n` entries, each of `stride` bytes from a contiguous memory</span></a>
+<a class="sourceLine" id="cb107-249" title="249"><span class="co">// area src into the ring `buffer`. Returns the ring buffer&#39;s new head</span></a>
+<a class="sourceLine" id="cb107-250" title="250"><span class="co">// pointer.</span></a>
+<a class="sourceLine" id="cb107-251" title="251"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-252" title="252"><span class="co">// It is possible to overflow the buffer with this function</span></a>
+<a class="sourceLine" id="cb107-253" title="253"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-254" title="254"><span class="co">//   buffer: the ring buffer to copy data into</span></a>
+<a class="sourceLine" id="cb107-255" title="255"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-256" title="256"><span class="co">//   src: the source memory to copy from (make sure this is big enough</span></a>
+<a class="sourceLine" id="cb107-257" title="257"><span class="co">//           or you will get crashes and other terrible things).</span></a>
+<a class="sourceLine" id="cb107-258" title="258"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-259" title="259"><span class="co">//   n: the number of entries to copy from `src` into `buffer` (each</span></a>
+<a class="sourceLine" id="cb107-260" title="260"><span class="co">//           of which is `stride` bytes long).</span></a>
+<a class="sourceLine" id="cb107-261" title="261"><span class="dt">const</span> <span class="dt">void</span> * ring_buffer_push(ring_buffer *buffer, <span class="dt">const</span> <span class="dt">void</span> *src, <span class="dt">size_t</span> n);</a>
+<a class="sourceLine" id="cb107-262" title="262"></a>
+<a class="sourceLine" id="cb107-263" title="263"><span class="co">// Destructively copy `n` entries (each of which is `stride` bytes)</span></a>
+<a class="sourceLine" id="cb107-264" title="264"><span class="co">// from a ring buffer `buffer` into contiguous memory region `dest`.</span></a>
+<a class="sourceLine" id="cb107-265" title="265"><span class="co">// This updates the `tail` pointers in the ring buffer and returns the</span></a>
+<a class="sourceLine" id="cb107-266" title="266"><span class="co">// new tail pointer.</span></a>
+<a class="sourceLine" id="cb107-267" title="267"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-268" title="268"><span class="co">// The `n` entries will no longer be available in the ring buffer.</span></a>
+<a class="sourceLine" id="cb107-269" title="269"><span class="co">// To do a nondestructive read, use `ring_buffer_read()`.</span></a>
+<a class="sourceLine" id="cb107-270" title="270"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-271" title="271"><span class="co">//   buffer: the ring buffer to copy data from</span></a>
+<a class="sourceLine" id="cb107-272" title="272"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-273" title="273"><span class="co">//   dest: the destination memory to copy into (make sure this is big enough</span></a>
+<a class="sourceLine" id="cb107-274" title="274"><span class="co">//           or you will get crashes and other terrible things).</span></a>
+<a class="sourceLine" id="cb107-275" title="275"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-276" title="276"><span class="co">//   n: the number of entries to copy from `src` into `buffer` (each</span></a>
+<a class="sourceLine" id="cb107-277" title="277"><span class="co">//           of which is `stride` bytes long).</span></a>
+<a class="sourceLine" id="cb107-278" title="278"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-279" title="279"><span class="co">// This function will not allow the ring buffer to underflow.  If</span></a>
+<a class="sourceLine" id="cb107-280" title="280"><span class="co">// `n` is greater than the number of available entries, then</span></a>
+<a class="sourceLine" id="cb107-281" title="281"><span class="co">// nothing is copied (and the ring buffer remains unmodified) and NULL</span></a>
+<a class="sourceLine" id="cb107-282" title="282"><span class="co">// is returned.</span></a>
+<a class="sourceLine" id="cb107-283" title="283"><span class="dt">const</span> <span class="dt">void</span> * ring_buffer_take(ring_buffer *buffer, <span class="dt">void</span> *dest, <span class="dt">size_t</span> n);</a>
+<a class="sourceLine" id="cb107-284" title="284"></a>
+<a class="sourceLine" id="cb107-285" title="285"><span class="co">// Nondestructively read from a ring buffer.  This function is</span></a>
+<a class="sourceLine" id="cb107-286" title="286"><span class="co">// essentially identical to `ring_buffer_take` but does not alter the</span></a>
+<a class="sourceLine" id="cb107-287" title="287"><span class="co">// tail pointer.</span></a>
+<a class="sourceLine" id="cb107-288" title="288"><span class="dt">const</span> <span class="dt">void</span> * ring_buffer_read(<span class="dt">const</span> ring_buffer *buffer, <span class="dt">void</span> *dest, <span class="dt">size_t</span> n);</a>
+<a class="sourceLine" id="cb107-289" title="289"></a>
+<a class="sourceLine" id="cb107-290" title="290"><span class="co">// ring_buffer_take_head and ring_buffer_read_head are like</span></a>
+<a class="sourceLine" id="cb107-291" title="291"><span class="co">// ring_buffer_take and ring_buffer_read (respectively) but operate on</span></a>
+<a class="sourceLine" id="cb107-292" title="292"><span class="co">// the *head* of the ring (i.e., removing the most recently added</span></a>
+<a class="sourceLine" id="cb107-293" title="293"><span class="co">// elements rather than the oldest elements).</span></a>
+<a class="sourceLine" id="cb107-294" title="294"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-295" title="295"><span class="co">// Neither will underflow, returning NULL if there are not enough</span></a>
+<a class="sourceLine" id="cb107-296" title="296"><span class="co">// elements, and without copying anything.</span></a>
+<a class="sourceLine" id="cb107-297" title="297"><span class="dt">const</span> <span class="dt">void</span> * ring_buffer_take_head(ring_buffer *buffer, <span class="dt">void</span> *dest, <span class="dt">size_t</span> n);</a>
+<a class="sourceLine" id="cb107-298" title="298"><span class="dt">const</span> <span class="dt">void</span> * ring_buffer_read_head(<span class="dt">const</span> ring_buffer *buffer, <span class="dt">void</span> *dest,</a>
+<a class="sourceLine" id="cb107-299" title="299">                                   <span class="dt">size_t</span> n);</a>
+<a class="sourceLine" id="cb107-300" title="300"></a>
+<a class="sourceLine" id="cb107-301" title="301"><span class="co">// Copy `n` entries (each of `stride` bytes) from one ring buffer</span></a>
+<a class="sourceLine" id="cb107-302" title="302"><span class="co">// `src` into another `dest`.  The copy starts at the tail of this</span></a>
+<a class="sourceLine" id="cb107-303" title="303"><span class="co">// ring buffer, pushing onto the head of the destination buffer.</span></a>
+<a class="sourceLine" id="cb107-304" title="304"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-305" title="305"><span class="co">//   src: A ring buffer to copy data from</span></a>
+<a class="sourceLine" id="cb107-306" title="306"></a>
+<a class="sourceLine" id="cb107-307" title="307"><span class="co">//   dest: A ring buffer to copy data into</span></a>
+<a class="sourceLine" id="cb107-308" title="308"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-309" title="309"><span class="co">//   n: the number of entries to copy (each of which is `stride` bytes)</span></a>
+<a class="sourceLine" id="cb107-310" title="310"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-311" title="311"><span class="co">// This is destructive to both buffers as pointers will be updated in</span></a>
+<a class="sourceLine" id="cb107-312" title="312"><span class="co">// both.</span></a>
+<a class="sourceLine" id="cb107-313" title="313"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-314" title="314"><span class="co">// This function returns the new head pointer of the destination buffer.</span></a>
+<a class="sourceLine" id="cb107-315" title="315"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-316" title="316"><span class="co">// It is not possible to underflow `src`; if too few entries are</span></a>
+<a class="sourceLine" id="cb107-317" title="317"><span class="co">// available, then nothing is copied, `src` and `dest` are not</span></a>
+<a class="sourceLine" id="cb107-318" title="318"><span class="co">// modified, and the function returns NULL</span></a>
+<a class="sourceLine" id="cb107-319" title="319"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-320" title="320"><span class="co">// It is possible to overflow `dest` and the tail pointer will be</span></a>
+<a class="sourceLine" id="cb107-321" title="321"><span class="co">// updated appropriately if so.</span></a>
+<a class="sourceLine" id="cb107-322" title="322"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-323" title="323"><span class="co">// Warning: the two buffers must have the same stride.  If the buffers</span></a>
+<a class="sourceLine" id="cb107-324" title="324"><span class="co">// do not have the same stride, the function will return NULL (this</span></a>
+<a class="sourceLine" id="cb107-325" title="325"><span class="co">// means if the function returns NULL it could either be an underflow</span></a>
+<a class="sourceLine" id="cb107-326" title="326"><span class="co">// or an incompatible buffer).</span></a>
+<a class="sourceLine" id="cb107-327" title="327"><span class="dt">const</span> <span class="dt">void</span> * ring_buffer_copy(ring_buffer *src, ring_buffer *dest, <span class="dt">size_t</span> n);</a>
+<a class="sourceLine" id="cb107-328" title="328"></a>
+<a class="sourceLine" id="cb107-329" title="329"><span class="co">// Mirror the contents of ring buffer `src` into ring buffer `dest`.</span></a>
+<a class="sourceLine" id="cb107-330" title="330"><span class="co">// This differs from `ring_buffer_copy` in that the `src` buffer is</span></a>
+<a class="sourceLine" id="cb107-331" title="331"><span class="co">// not modified and that the *entire* state of the ring buffer is</span></a>
+<a class="sourceLine" id="cb107-332" title="332"><span class="co">// duplicated.</span></a>
+<a class="sourceLine" id="cb107-333" title="333"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-334" title="334"><span class="co">// The function requires (and checks) that `src` and `dest` agree on</span></a>
+<a class="sourceLine" id="cb107-335" title="335"><span class="co">// size and stride (and therefore total bytes).  It returns `true` if</span></a>
+<a class="sourceLine" id="cb107-336" title="336"><span class="co">// the mirror was done, and `false` if the buffers are incompatible.</span></a>
+<a class="sourceLine" id="cb107-337" title="337"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-338" title="338"><span class="co">// This function will destroy all data in `dest`, but not allocate any</span></a>
+<a class="sourceLine" id="cb107-339" title="339"><span class="co">// memory.</span></a>
+<a class="sourceLine" id="cb107-340" title="340"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-341" title="341"><span class="co">// Warning: the two buffers must have the same stride *and* the same</span></a>
+<a class="sourceLine" id="cb107-342" title="342"><span class="co">// size.  If they do not, the function will return NULL (this means if</span></a>
+<a class="sourceLine" id="cb107-343" title="343"><span class="co">// the function returns NULL it could either be an underflow or an</span></a>
+<a class="sourceLine" id="cb107-344" title="344"><span class="co">// incompatible buffer).</span></a>
+<a class="sourceLine" id="cb107-345" title="345"><span class="dt">bool</span> ring_buffer_mirror(<span class="dt">const</span> ring_buffer *src, ring_buffer *dest);</a>
+<a class="sourceLine" id="cb107-346" title="346"></a>
+<a class="sourceLine" id="cb107-347" title="347"><span class="co">// Returns a pointer to the tail (reading end) of the buffer, offset</span></a>
+<a class="sourceLine" id="cb107-348" title="348"><span class="co">// by `offset` entries.  When used as `ring_buffer_tail_offset(x, 0)`</span></a>
+<a class="sourceLine" id="cb107-349" title="349"><span class="co">// this is equivalent to `ring_buffer_tail(x)` except that it will do</span></a>
+<a class="sourceLine" id="cb107-350" title="350"><span class="co">// underflow checking.</span></a>
+<a class="sourceLine" id="cb107-351" title="351"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-352" title="352"><span class="co">//   buffer: the ring buffer to use</span></a>
+<a class="sourceLine" id="cb107-353" title="353"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-354" title="354"><span class="co">//   offset: the number of entries (each of which are `stride` bytes)</span></a>
+<a class="sourceLine" id="cb107-355" title="355"><span class="co">//           to offset by</span></a>
+<a class="sourceLine" id="cb107-356" title="356"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-357" title="357"><span class="co">// It is not possible to underflow the buffer here; if `offset` is so</span></a>
+<a class="sourceLine" id="cb107-358" title="358"><span class="co">// large that it would underflow, then NULL will be returned.</span></a>
+<a class="sourceLine" id="cb107-359" title="359"><span class="dt">const</span> <span class="dt">void</span> * ring_buffer_tail_offset(<span class="dt">const</span> ring_buffer *buffer, <span class="dt">size_t</span> offset);</a>
+<a class="sourceLine" id="cb107-360" title="360"></a>
+<a class="sourceLine" id="cb107-361" title="361"><span class="co">// As for `ring_buffer_tail_offset`, but offsetting the *head*</span></a>
+<a class="sourceLine" id="cb107-362" title="362"><span class="co">// pointer.  This offsets in the opposite direction (moving from the</span></a>
+<a class="sourceLine" id="cb107-363" title="363"><span class="co">// most recently added element towards the oldest element).</span></a>
+<a class="sourceLine" id="cb107-364" title="364"><span class="dt">const</span> <span class="dt">void</span> * ring_buffer_head_offset(<span class="dt">const</span> ring_buffer *buffer, <span class="dt">size_t</span> offset);</a>
+<a class="sourceLine" id="cb107-365" title="365"></a>
+<a class="sourceLine" id="cb107-366" title="366"><span class="co">//// For advanced use: ////</span></a>
+<a class="sourceLine" id="cb107-367" title="367"></a>
+<a class="sourceLine" id="cb107-368" title="368"><span class="co">// Advance the ring buffer by one entry and return a pointer to the</span></a>
+<a class="sourceLine" id="cb107-369" title="369"><span class="co">// memory *without writing anything to it*.  In this case, the calling</span></a>
+<a class="sourceLine" id="cb107-370" title="370"><span class="co">// function is responsible for setting the memory to something</span></a>
+<a class="sourceLine" id="cb107-371" title="371"><span class="co">// sensible.  This is currently used in the dde package where we want</span></a>
+<a class="sourceLine" id="cb107-372" title="372"><span class="co">// to write directly to the head.</span></a>
+<a class="sourceLine" id="cb107-373" title="373"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-374" title="374"><span class="co">// This is (roughly) equivalent to:</span></a>
+<a class="sourceLine" id="cb107-375" title="375"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-376" title="376"><span class="co">//    ring_buffer_set(buffer, 0, 1);</span></a>
+<a class="sourceLine" id="cb107-377" title="377"><span class="co">//    return buffer-&gt;head;</span></a>
+<a class="sourceLine" id="cb107-378" title="378"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-379" title="379"><span class="co">// but does not actually copy any data.</span></a>
+<a class="sourceLine" id="cb107-380" title="380"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-381" title="381"><span class="co">// Note that the pointer returned is *not* const; this is always used</span></a>
+<a class="sourceLine" id="cb107-382" title="382"><span class="co">// in a case where the aim is to write to the head directly!</span></a>
+<a class="sourceLine" id="cb107-383" title="383"><span class="dt">void</span> * ring_buffer_head_advance(ring_buffer *buffer);</a>
+<a class="sourceLine" id="cb107-384" title="384"></a>
+<a class="sourceLine" id="cb107-385" title="385"><span class="co">//// Search: ////</span></a>
+<a class="sourceLine" id="cb107-386" title="386"></a>
+<a class="sourceLine" id="cb107-387" title="387"><span class="co">// There are two functions for searching for data within a ring buffer</span></a>
+<a class="sourceLine" id="cb107-388" title="388"><span class="co">// that consists of *sorted* entries.  This might be the case if</span></a>
+<a class="sourceLine" id="cb107-389" title="389"><span class="co">// entries are added sequentially with (say) a timestamp.</span></a>
+<a class="sourceLine" id="cb107-390" title="390"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-391" title="391"><span class="co">// To locate an entry, a predicate function (pointer) must be</span></a>
+<a class="sourceLine" id="cb107-392" title="392"><span class="co">// provided.  This must be a function taking two void pointers as</span></a>
+<a class="sourceLine" id="cb107-393" title="393"><span class="co">// arguments; the first will be the pointer to an entry in the ring</span></a>
+<a class="sourceLine" id="cb107-394" title="394"><span class="co">// buffer, the second will be any data that *you* provide (may be</span></a>
+<a class="sourceLine" id="cb107-395" title="395"><span class="co">// NULL).  This function must return &quot;true&quot; if the value is *less</span></a>
+<a class="sourceLine" id="cb107-396" title="396"><span class="co">// than* the target value (i.e. true if we should search *earlier* in</span></a>
+<a class="sourceLine" id="cb107-397" title="397"><span class="co">// the buffer).  The &quot;x&quot; argument must be treated as read-only.</span></a>
+<a class="sourceLine" id="cb107-398" title="398"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-399" title="399"><span class="co">// For example, a predictate function that would find an entry where</span></a>
+<a class="sourceLine" id="cb107-400" title="400"><span class="co">// the first 8 bytes of a ring buffer entry represent doubles could be</span></a>
+<a class="sourceLine" id="cb107-401" title="401"><span class="co">// written as:</span></a>
+<a class="sourceLine" id="cb107-402" title="402"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-403" title="403"><span class="co">//     bool test_find_double(const void *x, void *data) {</span></a>
+<a class="sourceLine" id="cb107-404" title="404"><span class="co">//       double x_value = *((double*) x);</span></a>
+<a class="sourceLine" id="cb107-405" title="405"><span class="co">//       double data_value = *((double*) data);</span></a>
+<a class="sourceLine" id="cb107-406" title="406"><span class="co">//       return x_value &lt;= data_value;</span></a>
+<a class="sourceLine" id="cb107-407" title="407"><span class="co">//     }</span></a>
+<a class="sourceLine" id="cb107-408" title="408"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-409" title="409"><span class="co">// Where the &quot;data&quot; argument will be passed through as the number to</span></a>
+<a class="sourceLine" id="cb107-410" title="410"><span class="co">// search for.</span></a>
+<a class="sourceLine" id="cb107-411" title="411"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-412" title="412"><span class="co">// These functions return NULL if no entry is found, otherwise they</span></a>
+<a class="sourceLine" id="cb107-413" title="413"><span class="co">// return the pointer to the largest entry in the buffer that the</span></a>
+<a class="sourceLine" id="cb107-414" title="414"><span class="co">// predicate returns false.</span></a>
+<a class="sourceLine" id="cb107-415" title="415"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-416" title="416"><span class="co">// The _linear search does a naive linear search from the tail of the</span></a>
+<a class="sourceLine" id="cb107-417" title="417"><span class="co">// buffer (i.e., the last entry that was added) towards the beginning.</span></a>
+<a class="sourceLine" id="cb107-418" title="418"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-419" title="419"><span class="co">// The _bisect search tries to be more clever and does a bisect</span></a>
+<a class="sourceLine" id="cb107-420" title="420"><span class="co">// search.  It requires an initial guess &quot;i&quot; to the location of the</span></a>
+<a class="sourceLine" id="cb107-421" title="421"><span class="co">// data.  You can provide &#39;0&#39; as &#39;i&#39; to start at the tail.</span></a>
+<a class="sourceLine" id="cb107-422" title="422"><span class="co">//</span></a>
+<a class="sourceLine" id="cb107-423" title="423"><span class="co">// The &quot;data&quot; argument to both functions will be passed through to the</span></a>
+<a class="sourceLine" id="cb107-424" title="424"><span class="co">// predicate function.</span></a>
+<a class="sourceLine" id="cb107-425" title="425"><span class="kw">typedef</span> <span class="dt">bool</span> ring_predicate(<span class="dt">const</span> <span class="dt">void</span> *x, <span class="dt">void</span> *data);</a>
+<a class="sourceLine" id="cb107-426" title="426"><span class="dt">const</span> <span class="dt">void</span> * ring_buffer_search_linear(<span class="dt">const</span> ring_buffer *buffer,</a>
+<a class="sourceLine" id="cb107-427" title="427">                                       ring_predicate pred, <span class="dt">void</span> *data);</a>
+<a class="sourceLine" id="cb107-428" title="428"><span class="dt">const</span> <span class="dt">void</span> * ring_buffer_search_bisect(<span class="dt">const</span> ring_buffer *buffer, <span class="dt">size_t</span> i,</a>
+<a class="sourceLine" id="cb107-429" title="429">                                       ring_predicate pred, <span class="dt">void</span> *data);</a>
+<a class="sourceLine" id="cb107-430" title="430"></a>
+<a class="sourceLine" id="cb107-431" title="431"><span class="pp">#ifdef __cplusplus</span></a>
+<a class="sourceLine" id="cb107-432" title="432">}</a>
+<a class="sourceLine" id="cb107-433" title="433"><span class="pp">#endif</span></a>
+<a class="sourceLine" id="cb107-434" title="434"><span class="pp">#endif</span></a></code></pre></div>
+<p>For a complete real-world example of use, see <a href="https://github.com/mrc-ide/dde">dde</a>, which uses a ring buffer to hold the history of a set of differential equations, and uses that to implement delay equations. Here, the ring buffer means that the memory requirements don’t grow with the length of running the simulation (as it only cares about fairly recent history, the natural overflow from the ring buffer is well suited). The memory is only allocated at the beginning of the simulation so there is no additional memory allocations. And because <code>ring</code> returns (const) pointers to the appropriate place in memory there is little copying.</p>
+<p>A simple application that implements the same mean-reverting simulation from above:</p>
+<div class="sourceCode" id="cb108"><pre class="sourceCode c"><code class="sourceCode c"><a class="sourceLine" id="cb108-1" title="1"><span class="pp">#include </span><span class="im">&lt;ring/ring.h&gt;</span></a>
+<a class="sourceLine" id="cb108-2" title="2"></a>
+<a class="sourceLine" id="cb108-3" title="3"><span class="pp">#include </span><span class="im">&lt;R.h&gt;</span></a>
+<a class="sourceLine" id="cb108-4" title="4"><span class="pp">#include </span><span class="im">&lt;Rinternals.h&gt;</span></a>
+<a class="sourceLine" id="cb108-5" title="5"></a>
+<a class="sourceLine" id="cb108-6" title="6"><span class="co">// Definition used below (can&#39;t be called step() because that may</span></a>
+<a class="sourceLine" id="cb108-7" title="7"><span class="co">// conflict with regexp.h on some platforms).</span></a>
+<a class="sourceLine" id="cb108-8" title="8"><span class="dt">int</span> step_x(ring_buffer *r, <span class="dt">int</span> x);</a>
+<a class="sourceLine" id="cb108-9" title="9"></a>
+<a class="sourceLine" id="cb108-10" title="10"><span class="dt">void</span> example(<span class="dt">size_t</span> nstep, <span class="dt">double</span> *ret) {</a>
+<a class="sourceLine" id="cb108-11" title="11">  <span class="co">// Construct a ring buffer of (max) size 5, each element of which is</span></a>
+<a class="sourceLine" id="cb108-12" title="12">  <span class="co">// big enough to contain an integer (probably 4 bytes).</span></a>
+<a class="sourceLine" id="cb108-13" title="13">  ring_buffer *r = ring_buffer_create(<span class="dv">5</span>, <span class="kw">sizeof</span>(<span class="dt">int</span>), OVERFLOW_OVERWRITE);</a>
+<a class="sourceLine" id="cb108-14" title="14"></a>
+<a class="sourceLine" id="cb108-15" title="15">  <span class="co">// Starting point of the simulation, as in the R version:</span></a>
+<a class="sourceLine" id="cb108-16" title="16">  <span class="dt">int</span> x = <span class="dv">0</span>;</a>
+<a class="sourceLine" id="cb108-17" title="17"></a>
+<a class="sourceLine" id="cb108-18" title="18">  <span class="co">// Push the initial state into the ring buffer:</span></a>
+<a class="sourceLine" id="cb108-19" title="19">  ring_buffer_push(r, &amp;x, <span class="dv">1</span>);</a>
+<a class="sourceLine" id="cb108-20" title="20">  ret[<span class="dv">0</span>] = x;</a>
+<a class="sourceLine" id="cb108-21" title="21"></a>
+<a class="sourceLine" id="cb108-22" title="22">  <span class="cf">for</span> (<span class="dt">size_t</span> i = <span class="dv">1</span>; i &lt; nstep; ++i) {</a>
+<a class="sourceLine" id="cb108-23" title="23">    x = step_x(r, x);</a>
+<a class="sourceLine" id="cb108-24" title="24">    ring_buffer_push(r, &amp;x, <span class="dv">1</span>);</a>
+<a class="sourceLine" id="cb108-25" title="25">    ret[i] = x;</a>
+<a class="sourceLine" id="cb108-26" title="26">  }</a>
+<a class="sourceLine" id="cb108-27" title="27"></a>
+<a class="sourceLine" id="cb108-28" title="28">  <span class="co">// Cleanup:</span></a>
+<a class="sourceLine" id="cb108-29" title="29">  ring_buffer_destroy(r);</a>
+<a class="sourceLine" id="cb108-30" title="30">}</a>
+<a class="sourceLine" id="cb108-31" title="31"></a>
+<a class="sourceLine" id="cb108-32" title="32"><span class="dt">int</span> step_x(ring_buffer *r, <span class="dt">int</span> x) {</a>
+<a class="sourceLine" id="cb108-33" title="33">  <span class="dt">size_t</span> n = ring_buffer_used(r, false);</a>
+<a class="sourceLine" id="cb108-34" title="34">  <span class="dt">double</span> p;</a>
+<a class="sourceLine" id="cb108-35" title="35">  <span class="cf">if</span> (n &lt; <span class="dv">2</span>) {</a>
+<a class="sourceLine" id="cb108-36" title="36">    p = <span class="fl">0.5</span>;</a>
+<a class="sourceLine" id="cb108-37" title="37">  } <span class="cf">else</span> {</a>
+<a class="sourceLine" id="cb108-38" title="38">    <span class="co">// Oldest non-overflowed element is in the tail.  Note that the</span></a>
+<a class="sourceLine" id="cb108-39" title="39">    <span class="co">// return value (which is void*) must be first cast to (int*) then</span></a>
+<a class="sourceLine" id="cb108-40" title="40">    <span class="co">// dereferenced.</span></a>
+<a class="sourceLine" id="cb108-41" title="41">    <span class="co">///</span></a>
+<a class="sourceLine" id="cb108-42" title="42">    <span class="co">// </span><span class="al">NOTE</span><span class="co">: In general, check that the return value here is not NULL</span></a>
+<a class="sourceLine" id="cb108-43" title="43">    <span class="co">// (indicating an underflow); here we&#39;re OK because we checked the</span></a>
+<a class="sourceLine" id="cb108-44" title="44">    <span class="co">// number of used elements at the beginning.</span></a>
+<a class="sourceLine" id="cb108-45" title="45">    <span class="dt">int</span> x0 = *(<span class="dt">int</span>*)ring_buffer_tail(r);</a>
+<a class="sourceLine" id="cb108-46" title="46">    <span class="dt">size_t</span> increases = <span class="dv">0</span>;</a>
+<a class="sourceLine" id="cb108-47" title="47">    <span class="cf">for</span> (<span class="dt">size_t</span> i = <span class="dv">1</span>; i &lt; n; ++i) {</a>
+<a class="sourceLine" id="cb108-48" title="48">      <span class="co">// Moving through the more recently added elements:</span></a>
+<a class="sourceLine" id="cb108-49" title="49">      <span class="dt">int</span> x1 = *(<span class="dt">int</span>*)ring_buffer_tail_offset(r, i);</a>
+<a class="sourceLine" id="cb108-50" title="50">      <span class="cf">if</span> (x1 &gt; x0) {</a>
+<a class="sourceLine" id="cb108-51" title="51">        increases++;</a>
+<a class="sourceLine" id="cb108-52" title="52">      }</a>
+<a class="sourceLine" id="cb108-53" title="53">      x0 = x1;</a>
+<a class="sourceLine" id="cb108-54" title="54">    }</a>
+<a class="sourceLine" id="cb108-55" title="55">    p = ((<span class="dt">double</span>)increases) / (n - <span class="dv">1</span>);</a>
+<a class="sourceLine" id="cb108-56" title="56">  }</a>
+<a class="sourceLine" id="cb108-57" title="57"></a>
+<a class="sourceLine" id="cb108-58" title="58">  <span class="cf">if</span> (unif_rand() &lt; p) {</a>
+<a class="sourceLine" id="cb108-59" title="59">    --x;</a>
+<a class="sourceLine" id="cb108-60" title="60">  } <span class="cf">else</span> {</a>
+<a class="sourceLine" id="cb108-61" title="61">    ++x;</a>
+<a class="sourceLine" id="cb108-62" title="62">  }</a>
+<a class="sourceLine" id="cb108-63" title="63"></a>
+<a class="sourceLine" id="cb108-64" title="64">  <span class="cf">return</span> x;</a>
+<a class="sourceLine" id="cb108-65" title="65">}</a>
+<a class="sourceLine" id="cb108-66" title="66"></a>
+<a class="sourceLine" id="cb108-67" title="67"><span class="co">// This function collects all the R API bits that deal with</span></a>
+<a class="sourceLine" id="cb108-68" title="68"><span class="co">// communication between C and R.  &quot;Writing R extensions&quot; is the</span></a>
+<a class="sourceLine" id="cb108-69" title="69"><span class="co">// canonical documentation source.</span></a>
+<a class="sourceLine" id="cb108-70" title="70">SEXP r_example(SEXP r_nstep) {</a>
+<a class="sourceLine" id="cb108-71" title="71">  <span class="dt">size_t</span> nstep = (<span class="dt">size_t</span>) INTEGER(r_nstep)[<span class="dv">0</span>];</a>
+<a class="sourceLine" id="cb108-72" title="72">  SEXP ret = PROTECT(allocVector(REALSXP, nstep));</a>
+<a class="sourceLine" id="cb108-73" title="73">  GetRNGstate(); <span class="co">// because we&#39;ll work with random numbers</span></a>
+<a class="sourceLine" id="cb108-74" title="74">  example(nstep, REAL(ret));</a>
+<a class="sourceLine" id="cb108-75" title="75">  <span class="co">// Cleanup:</span></a>
+<a class="sourceLine" id="cb108-76" title="76">  PutRNGstate();</a>
+<a class="sourceLine" id="cb108-77" title="77">  UNPROTECT(<span class="dv">1</span>);</a>
+<a class="sourceLine" id="cb108-78" title="78">  <span class="cf">return</span> ret;</a>
+<a class="sourceLine" id="cb108-79" title="79">}</a>
+<a class="sourceLine" id="cb108-80" title="80"></a>
+<a class="sourceLine" id="cb108-81" title="81"><span class="co">// This can be included in a different file, or, for a single file</span></a>
+<a class="sourceLine" id="cb108-82" title="82"><span class="co">// project like this one, include here.</span></a>
+<a class="sourceLine" id="cb108-83" title="83"><span class="pp">#include </span><span class="im">&lt;ring/ring.c&gt;</span></a></code></pre></div>
+<div id="a-nontrivial-example" class="section level2">
+<h2>A nontrivial example</h2>
+<p>In the <a href="https://github.com/mrc-ide/dde"><code>dde</code></a> package (not yet on CRAN), I use ring buffers to solve delay differential equations (DDEs). To solve these, we need to know the state of the system at a series of points in the past. So at every time step we push the state of the system onto a ring buffer. Then, as the solver moves forward in time we can get the system at some previous point in time by looking back through the ring buffer until the time in question is found.</p>
+<p>In this application a ring buffer is the ideal data structure because we often want to solve equations where the time we look back is a small fraction of the total time. Without a ring buffer we’d either have to store the <em>entire</em> history (with a large memory cost, most of which is not needed) or periodically copy the history around.</p>
+<p>To use <code>ring</code> within the <code>dde</code> package:</p>
+<ul>
+<li><p>In the <code>DESCRIPTION</code> we <a href="https://github.com/mrc-ide/dde/blob/7ebaefd/DESCRIPTION#L14">declare a link to <code>ring</code></a> using the <code>LinkingTo:</code> field.</p></li>
+<li><p>In the <code>src</code> directory, <a href="https://github.com/mrc-ide/dde/blob/7ebaefd/src/ring.c">the contents of <code>&lt;ring/ring.c&gt;</code> are included</a>; this is possible because of the <code>LinkingTo</code> field. This file now includes all the actual ring buffer implementation.</p></li>
+<li><p>In <a href="https://github.com/mrc-ide/dde/blob/7ebaefd/src/dopri.h#L8">src/dopri.h</a> we include <code>&lt;ring/ring.h&gt;</code> which allows the ring buffer code to be used in any file that includes <code>dopri.h</code>. There is a <a href="https://github.com/mrc-ide/dde/blob/7ebaefd/src/dopri.h#L77-L111">data structure in this header</a> that includes within itself a ring buffer to hold the history.</p></li>
+<li><p>In <a href="https://github.com/mrc-ide/dde/blob/7ebaefd/src/dopri.c">src/dopri.c</a> the ring buffer code is actually used:</p>
+<ul>
+<li><a href="https://github.com/mrc-ide/dde/blob/7ebaefd/src/dopri.c#L48-L50">initialisation</a></li>
+<li><a href="https://github.com/mrc-ide/dde/blob/7ebaefd/src/dopri.c#L694-L719">a time is found within the ring buffer</a></li>
+<li><a href="https://github.com/mrc-ide/dde/blob/7ebaefd/src/dopri.c#L417">the ring buffer is advanced</a></li>
+<li><a href="https://github.com/mrc-ide/dde/blob/7ebaefd/src/dopri.c#L220">the data is freed</a></li>
+</ul></li>
+<li><p>In <a href="https://github.com/mrc-ide/dde/blob/7ebaefd/src/dopri_5.c#L109-L119">src/dopri_5.c</a> new data is written to the head of the ring buffer, being the state of the system at the end of the step. The history head is treated as a big block of contiguous doubles.</p></li>
+</ul>
+<p>Used this way, the programmer can focus on simply writing to the application and do as little work on bookkeeping as possible.</p>
+</div>
+</div>
+<div id="the-c-api-1" class="section level1">
+<h1>The C++ API</h1>
+<p>If you’re using C++ you may find the <a href="https://www.boost.org/doc/libs/1_61_0/doc/html/circular_buffer.html">Boost circular buffer</a> is likely to be far better; you can use this by <code>LinkingTo:</code> the <code>BH</code> package and using <code>#include &lt;boost/circular_buffer.hpp&gt;</code> in your code.</p>
+<p>Alternatively, the <code>ring</code> C code can be directly used in C++ as above. Or, there is a class-based approach available:</p>
+<ul>
+<li><p>In your <code>src/</code> directory, add a file <code>ring.cpp</code> containing just the line <code>#include &lt;ring/ring.cpp&gt;</code></p></li>
+<li><p>Anywhere in your code you want to use the ring buffer, include the line <code>#include &lt;dde/dde.hpp&gt;</code> to include the class definition:</p></li>
+</ul>
+<div class="sourceCode" id="cb109"><pre class="sourceCode cpp"><code class="sourceCode cpp"><a class="sourceLine" id="cb109-1" title="1"><span class="pp">#ifndef _RING_HPP_</span></a>
+<a class="sourceLine" id="cb109-2" title="2"><span class="pp">#define _</span>RING_HPP_</a>
+<a class="sourceLine" id="cb109-3" title="3"></a>
+<a class="sourceLine" id="cb109-4" title="4"><span class="co">// </span><span class="al">NOTE</span><span class="co">: the C++ version always uses non-R memory allocation functions</span></a>
+<a class="sourceLine" id="cb109-5" title="5"><span class="co">// because otherwise the R error can jump over destructors causing</span></a>
+<a class="sourceLine" id="cb109-6" title="6"><span class="co">// memory leaks or worse.  Errors will be thrown with &quot;throw&quot;, which</span></a>
+<a class="sourceLine" id="cb109-7" title="7"><span class="co">// Rcpp will catch if you use that.</span></a>
+<a class="sourceLine" id="cb109-8" title="8"><span class="co">//</span></a>
+<a class="sourceLine" id="cb109-9" title="9"><span class="co">// However, note that if using overflow_action of anything other than</span></a>
+<a class="sourceLine" id="cb109-10" title="10"><span class="co">// OVERFLOW_OVERWRITE is possibly unsafe; OVERFLOW_GROW is fine so</span></a>
+<a class="sourceLine" id="cb109-11" title="11"><span class="co">// long as you never run out of memory, and OVERFLOW_ERROR is probably</span></a>
+<a class="sourceLine" id="cb109-12" title="12"><span class="co">// never safe.</span></a>
+<a class="sourceLine" id="cb109-13" title="13"><span class="pp">#define RING_USE_STDLIB_ALLOC </span><span class="dv">1</span></a>
+<a class="sourceLine" id="cb109-14" title="14"><span class="pp">#include </span><span class="im">&lt;ring/ring.h&gt;</span></a>
+<a class="sourceLine" id="cb109-15" title="15"></a>
+<a class="sourceLine" id="cb109-16" title="16"><span class="kw">class</span> RingBuffer {</a>
+<a class="sourceLine" id="cb109-17" title="17">  ring_buffer * buffer;</a>
+<a class="sourceLine" id="cb109-18" title="18"><span class="kw">public</span>:</a>
+<a class="sourceLine" id="cb109-19" title="19">  RingBuffer(<span class="dt">size_t</span> size, <span class="dt">size_t</span> stride, overflow_action on_overflow);</a>
+<a class="sourceLine" id="cb109-20" title="20">  ~RingBuffer();</a>
+<a class="sourceLine" id="cb109-21" title="21">  RingBuffer(<span class="at">const</span> RingBuffer&amp; other);</a>
+<a class="sourceLine" id="cb109-22" title="22">  RingBuffer&amp; <span class="kw">operator</span>=(RingBuffer other);</a>
+<a class="sourceLine" id="cb109-23" title="23"></a>
+<a class="sourceLine" id="cb109-24" title="24">  <span class="dt">void</span> grow(<span class="dt">size_t</span> n, <span class="dt">bool</span> exact);</a>
+<a class="sourceLine" id="cb109-25" title="25">  <span class="dt">void</span> reset(<span class="dt">bool</span> clear);</a>
+<a class="sourceLine" id="cb109-26" title="26">  <span class="dt">size_t</span> size(<span class="dt">bool</span> bytes) <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-27" title="27">  <span class="dt">size_t</span> free(<span class="dt">bool</span> bytes) <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-28" title="28">  <span class="dt">size_t</span> used(<span class="dt">bool</span> bytes) <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-29" title="29">  <span class="dt">size_t</span> bytes_data() <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-30" title="30">  <span class="dt">bool</span> is_full() <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-31" title="31">  <span class="dt">bool</span> is_empty() <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-32" title="32">  <span class="at">const</span> <span class="dt">void</span> * data() <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-33" title="33">  <span class="at">const</span> <span class="dt">void</span> * head() <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-34" title="34">  <span class="at">const</span> <span class="dt">void</span> * tail() <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-35" title="35">  <span class="dt">size_t</span> head_pos(<span class="dt">bool</span> bytes) <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-36" title="36">  <span class="dt">size_t</span> tail_pos(<span class="dt">bool</span> bytes) <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-37" title="37">  <span class="dt">size_t</span> set(<span class="dt">data_t</span> c, <span class="dt">size_t</span> len);</a>
+<a class="sourceLine" id="cb109-38" title="38">  <span class="dt">size_t</span> set_stride(<span class="at">const</span> <span class="dt">void</span> *x, <span class="dt">size_t</span> len);</a>
+<a class="sourceLine" id="cb109-39" title="39">  <span class="at">const</span> <span class="dt">void</span> * push(<span class="at">const</span> <span class="dt">void</span> *src, <span class="dt">size_t</span> n);</a>
+<a class="sourceLine" id="cb109-40" title="40">  <span class="at">const</span> <span class="dt">void</span> * take(<span class="dt">void</span> *dest, <span class="dt">size_t</span> n);</a>
+<a class="sourceLine" id="cb109-41" title="41">  <span class="at">const</span> <span class="dt">void</span> * read(<span class="dt">void</span> *dest, <span class="dt">size_t</span> n) <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-42" title="42">  <span class="at">const</span> <span class="dt">void</span> * copy(RingBuffer&amp; dest, <span class="dt">size_t</span> n);</a>
+<a class="sourceLine" id="cb109-43" title="43">  <span class="dt">bool</span> mirror(RingBuffer&amp; dest) <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-44" title="44">  <span class="at">const</span> <span class="dt">void</span> * tail_offset(<span class="dt">size_t</span> offset) <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-45" title="45">  <span class="at">const</span> <span class="dt">void</span> * head_offset(<span class="dt">size_t</span> offset) <span class="at">const</span>;</a>
+<a class="sourceLine" id="cb109-46" title="46">};</a>
+<a class="sourceLine" id="cb109-47" title="47"></a>
+<a class="sourceLine" id="cb109-48" title="48"><span class="pp">#endif</span></a></code></pre></div>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

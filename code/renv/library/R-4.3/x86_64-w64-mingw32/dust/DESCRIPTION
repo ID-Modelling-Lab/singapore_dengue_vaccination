@@ -1,0 +1,54 @@
+Package: dust
+Title: Iterate Multiple Realisations of Stochastic Models
+Version: 0.15.1
+Authors@R: c(person("Rich", "FitzJohn", role = c("aut", "cre"),
+                    email = "rich.fitzjohn@gmail.com"),
+             person("Alex", "Hill", role = "aut"),
+             person("John", "Lees", role = "aut"),
+             person("Imperial College of Science, Technology and Medicine",
+                    role = "cph"))
+Description: An Engine for simulation of stochastic models. Includes
+    support for running stochastic models in parallel, either with
+    shared or varying parameters. Simulations are run efficiently in
+    compiled code and can be run with a fraction of simulated states
+    returned to R, allowing control over memory usage. Support is
+    provided for building bootstrap particle filter for performing
+    Sequential Monte Carlo (e.g., Gordon et al. 1993
+    <doi:10.1049/ip-f-2.1993.0015>). The core of the simulation engine is
+    the 'xoshiro256**' algorithm (Blackman and Vigna
+    <arXiv:1805.01407>), and the package is further described in
+    FitzJohn et al 2021 <doi:10.12688/wellcomeopenres.16466.2>.
+URL: https://github.com/mrc-ide/dust
+BugReports: https://github.com/mrc-ide/dust/issues
+License: MIT + file LICENSE
+Encoding: UTF-8
+Language: en-GB
+Requires: R (>= 4.0.0)
+Imports: R6, cpp11 (>= 0.4.0), glue, pkgbuild (>= 1.2.0), pkgload,
+        withr
+LinkingTo: cpp11 (>= 0.4.4)
+Suggests: bench, brio, callr, dde, decor, fs, knitr, mockery,
+        rmarkdown, testthat (>= 3.0.0)
+RoxygenNote: 7.2.3
+Roxygen: list(markdown = TRUE)
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+RemoteType: github
+RemoteHost: api.github.com
+RemoteRepo: dust
+RemoteUsername: mrc-ide
+RemoteRef: v0.15.1
+RemoteSha: 33696618991b86890df7059595b8d8709261f98d
+GithubRepo: dust
+GithubUsername: mrc-ide
+GithubRef: v0.15.1
+GithubSHA1: 33696618991b86890df7059595b8d8709261f98d
+NeedsCompilation: yes
+Packaged: 2024-08-19 02:44:12 UTC; abhisena
+Author: Rich FitzJohn [aut, cre],
+  Alex Hill [aut],
+  John Lees [aut],
+  Imperial College of Science, Technology and Medicine [cph]
+Maintainer: Rich FitzJohn <rich.fitzjohn@gmail.com>
+Built: R 4.3.1; x86_64-w64-mingw32; 2024-08-19 02:44:20 UTC; windows
+Archs: x64
