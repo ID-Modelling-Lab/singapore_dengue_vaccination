@@ -18,6 +18,7 @@ library(tidyr)
 library(dplyr)
 library(reshape2)
 library(cowplot)
+library(readxl)
 ```
 
 
@@ -3468,137 +3469,6 @@ ggsave(
 
 ## Supplementary
 
-```{r}
-# Function definitions remain unchanged and correct:
-get_agg_over_age <- function(arr) {
-  apply(arr, c(1,2,4), sum)
-}
-
-get_cumulative_over_time <- function(arr, t_begin, t_end) {
-  apply(arr[, , t_begin:t_end], c(1, 2), sum)
-}
-
-get_total_infection <- function(output, t_begin, t_end){
-  output_agg_age <- get_agg_over_age(output)
-  output_cum_t <- get_cumulative_over_time(output_agg_age, t_begin, t_end)
-  return(output_cum_t)
-}
-
-# Main plotting function with improvements:
-get_plot_infection_serostatus <- function(rds_files, variable_name, y_lab, t_begin, t_end,
-                                          y_limits, y_breaks) {
-
-  serotypes <- c("DENV-1", "DENV-2", "DENV-3", "DENV-4")
-
-  primary_counts <- numeric(length(serotypes))
-  secondary_counts <- numeric(length(serotypes))
-
-  # Loop through each RDS file (one per serotype)
-  for (i in seq_along(rds_files)) {
-    primary_data <- extract_variable(rds_file = rds_files[i], 
-                                     variable_name = paste0(variable_name, "_primary")) +
-                    extract_variable(rds_file = rds_files[i], 
-                                     variable_name = paste0(variable_name, "_v_primary"))
-
-    secondary_data <- extract_variable(rds_file = rds_files[i], 
-                                       variable_name = paste0(variable_name, "_secondary")) +
-                      extract_variable(rds_file = rds_files[i], 
-                                       variable_name = paste0(variable_name, "_v_secondary"))
-
-    primary_total <- get_total_infection(primary_data, t_begin, t_end)
-    secondary_total <- get_total_infection(secondary_data, t_begin, t_end)
-
-    primary_counts[i] <- mean(primary_total[1,])
-    secondary_counts[i] <- mean(secondary_total[1,])
-  }
-
-  # Create dataframe correctly
-  df_inf <- data.frame(
-    DENV = serotypes,
-    Primary = primary_counts,
-    Secondary = secondary_counts
-  )
-  
-  print(df_inf)
-
-  # Convert to percentage format for stacked barplot
-  df_inf_perc <- df_inf %>%
-    pivot_longer(cols = c("Primary", "Secondary"),
-                 names_to = "Infection_Type",
-                 values_to = "Count") %>%
-    group_by(DENV) %>%
-    mutate(Percentage = Count / sum(Count) * 100)
-  
-    print(df_inf_perc)
-
-  # Plot the stacked bar chart
-  plot <- ggplot(df_inf_perc, aes(x = DENV, y = Percentage, fill = Infection_Type)) +
-  geom_bar(stat = "identity", position = "stack", width = 0.7, alpha = 1) +
-  scale_fill_manual(values = c("Primary" = "#1f78b4", "Secondary" = "#e31a1c")) +
-  scale_y_continuous(expand = c(0,0), limits = c(0, 100), breaks = seq(0,100,20)) +
-  labs(y = "Share of infection (%)", x = "") +
-  theme_bw(base_size = 16) +
-  theme(panel.border = element_rect(color = "black", size = 1.5),
-        legend.position = "top")
-
-  return(plot)
-}
-
-### Inputs (corrected):
-rds_files <- list(
-  "effi_inf_pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
-  "effi_inf_pri_sec_neq_detailed_a7_sero_dom_denv2_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
-  "effi_inf_pri_sec_neq_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
-  "effi_inf_pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds"
-)
-
-## Assume set_of_rds_files is your rds_files itself:
-t_begin <- readRDS(here::here("model_output", rds_files[[1]]))$v_year
-
-y_limits <- c(0, 80)
-y_breaks <- seq(0, 80, by = 20)
-
-## Now generate the plot:
-plot_aggregated_sero_share <- get_plot_infection_serostatus(
-  rds_files = rds_files,
-  variable_name = "symp_sample_age",
-  y_lab = "Share of infection (%)",
-  t_begin = t_begin,
-  t_end = t_begin + 9,
-  y_limits = y_limits,
-  y_breaks = y_breaks
-)
-
-print(plot_aggregated_sero_share)
-
-
-figure_name <- "share_c.jpg"
-
-
-
-
-# # ### save
-# ggsave(
-#   filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
-#   plot = plot_aggregated_sero_share,                                            # The plot object to save
-#   width = 20*2,                                           # Width in inches
-#   height = 40,                                          # Height in inches
-#   dpi = 300,
-#   units = "cm")                                  # DPI (resolution)
-
-
-
-```
-
-
-
-
-
-
-
-
-
-
 #### averted matrix for cases
 
 ```{r}
@@ -3658,7 +3528,7 @@ get_plot_averted_matrix <- function(df_averted_mean) {
     coord_fixed()  # Ensure square tiles
   
   
-  p
+  # p
 }
 
 
@@ -3801,8 +3671,6 @@ t_begin = readRDS(here::here("model_output",set_of_rds_files[[1]][1]) )$v_year
 
 age_list <- get_age_list(rds_file = set_of_rds_files[[1]][1])
 
-# y_limits <- c(0, 80)
-# y_breaks <- seq(0, 80, by = 20)
 ## Generate figure now
 plot_aggregated_impact_matrix <- get_arranged_plot_impact_matrix_age_gr(set_of_rds_files = set_of_rds_files,
                                                                              variable_name = "symp_sample_age",
@@ -3813,7 +3681,7 @@ plot_aggregated_impact_matrix <- get_arranged_plot_impact_matrix_age_gr(set_of_r
 
 
 
-figure_name <- "pri_sec_neq_aggregated_impact_matrix_symp.jpg"
+figure_name <- "impact_matrix_symp_aggregated.jpg"
 
 
 # # ### save
@@ -3881,9 +3749,6 @@ get_plot_averted_matrix <- function(df_averted_mean) {
       legend.key.height = unit(1.0, "cm"),  # Increase height of legend keys
       legend.key.width = unit(1.2, "cm"),  # Increase width of legend keys
       legend.background = element_blank()
-      # legend.position = "top",  # Position the legend on the right for clarity
-      # legend.direction = "horizontal",
-      # legend.key.width = unit(1.0, "cm")  # Make the legend key wider for better visibility
     ) + scale_x_continuous(breaks = 1:7, 
                            labels = age_group_labels) +
     scale_y_continuous(breaks = 1:7, 
@@ -3966,10 +3831,6 @@ get_arranged_plot_impact_matrix_age_gr <- function(set_of_rds_files, variable_na
                        variable_name = paste0(variable_name, "_v"))
 
     
-    ## to get rid of small number which will create large number when we divide to get the proportion
-    # nv_symp[nv_symp < 10] <- 0
-    # v_symp[v_symp < 10] <- 0
-    
     averted_inc <- get_averted_age(nv_output = nv_symp,
                                    v_output = v_symp,
                                    t_begin = t_begin,
@@ -4034,8 +3895,6 @@ t_begin = readRDS(here::here("model_output",set_of_rds_files[[1]][1]) )$v_year
 
 age_list <- get_age_list(rds_file = set_of_rds_files[[1]][1])
 
-# y_limits <- c(0, 80)
-# y_breaks <- seq(0, 80, by = 20)
 ## Generate figure now
 plot_aggregated_impact_matrix <- get_arranged_plot_impact_matrix_age_gr(set_of_rds_files = set_of_rds_files,
                                                                              variable_name = "hosp_sample_age",
@@ -4046,7 +3905,7 @@ plot_aggregated_impact_matrix <- get_arranged_plot_impact_matrix_age_gr(set_of_r
 
 
 
-figure_name <- "pri_sec_neq_aggregated_impact_matrix_hosp.jpg"
+figure_name <- "impact_matrix_symp_aggregated_hosp.jpg"
 
 
 # # ### save
@@ -4436,14 +4295,7 @@ ggsave(
 ```
 
 
-
-
-
-
-
 ## sensitivity on reporting rate for hospitalizations
-
-
 ```{r}
 
 ## aggregate over all the age groups
@@ -4808,345 +4660,47 @@ ggsave(
   dpi = 300,
   units = "cm")                                  # DPI (resolution)
 
-
-
-
-
 ```
 
 
-
-## Number of primary and secondary infection under 4 serotype dominance scenarios
-
+### VE efficacy estimate plot
 ```{r}
+source(here("utils","utils_vac_efficacy.R"))
 
-get_age_list <- function(rds_file) {
-  
-  result <- readRDS(here::here("model_output",  rds_file) )
-  
-  age_list <- result$v_age_list
-  
-  return(age_list)
-}
+# call function to grab the data from excel
+excel_efficacy = read_xlsx( here("data","qdenga_efficacy.xlsx"), 
+                            sheet = "cumulative_54" )
 
+# grab serotype stratified VE estimates
+df_efficacy <- get_raw_ve_from_trial(excel_efficacy = excel_efficacy)
 
-## cumulative number over year
-get_cumulative_over_time <- function(arr, t_begin, t_end) {
-  arr_cum_time <- apply(arr[, , ,t_begin:t_end], c(1, 2,3), sum)
-  return(arr_cum_time)
-}
-
-
-get_cumulative_over_time_age_wise <- function(arr, t_begin, t_end) {
-  arr_cum_time_age <- apply(arr[, , ,t_begin:t_end], c(1, 2, 3), sum)
-  
-  arr_cum_age_gr <- array(NA, dim = c(dim(arr)[1], dim(arr)[2], nrow(age_list) ))
-  
-  for (i in 1:nrow(age_list)) {
-    
-    arr_cum_age_gr[,,i] <-  apply(arr_cum_time_age[,,age_list[i,1]:age_list[i,2]], c(1, 2), sum)
-    
-  }
-  
-  return(arr_cum_age_gr)
-}
-## extract variable from .rds file
-extract_variable <- function(rds_file, variable_name) {
-  
-  result <- readRDS(here::here("model_output",  rds_file) )
-  
-  out_v <- as.data.frame(result$output, stringsAsFactors = FALSE)
-  
-  n_vac_age = result$n_vac_age
-  n_sample = result$n_sample
-  n_age = result$n_age
-  n_year = result$n_year
-  
-  x <- out_v[,colnames(out_v) == variable_name] 
-  
-  y <- array(NA, dim = c(n_vac_age,n_sample, n_age, n_year))
-  
-  for (i in 1:n_vac_age) {
-    
-    y[i,,,] <- x[[paste0("result.", i)]]
-  }
-  
-  return(y)
-}
-
-
-get_inci_serostatus <- function(output, t_begin, t_end){
+# Make sure factor levels are ordered correctly
+df_plot <- df_efficacy %>%
+  mutate(
+    group1 = factor(group1, levels = c("DENV1", "DENV2", "DENV3", "DENV4")),
+    group2 = factor(group2, levels = c("Sero+", "Sero-")),
+    group3 = factor(group3, levels = c("VCD", "Hospitalized"))
+  )
+# Create the plot with facet_wrap
+ggplot(df_plot, aes(x = group1,  y = ve, color = group3)) +
+    geom_line(show.legend = FALSE, lwd = 1, lty = 1) +
+  geom_point(show.legend = FALSE, size=3) +
+  geom_errorbar(aes(ymin = ve_low, ymax = ve_up),
+                width = 0.2,
+                size = 1,
+                show.legend = FALSE) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  facet_wrap(~ group3 + group2, ncol = 2,  scales = "free_y") +
+  scale_color_manual(values = c("VCD" = "#E74C3C", "Hospitalized" = "#00BFC4")) +
+  xlab("Serotype") +
+  theme_bw() +
+  # coord_fixed(ratio = 1) +  # Adjust aspect ratio as needed
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12),
+    strip.text = element_text(size = 10)
+  )
  
-  inci_cum_t <- get_cumulative_over_time_age_wise(output, t_begin = t_begin, t_end = t_end)
-  
-  inci_serostatus <- inci_cum_t[1,,]/100000
-  
-  
-  return(t(inci_serostatus))
-  
-}
-
-
-
-get_plot_inci_serostatus <- function(df_total, df_seroneg, df_seropos, y_limits, y_breaks) {
-  
-  
-  # Add a column for age groups
-  df_total$age <- 1:nrow(df_total)
-  df_seroneg$age <- 1:nrow(df_seroneg)
-  df_seropos$age <- 1:nrow(df_seropos)
-  
-  # Reshape the dataframes to long format
-  df_total_long <- gather(df_total, key = "Realization", value = "Output", -age)
-  df_seroneg_long <- gather(df_seroneg, key = "Realization", value = "Output", -age)
-  df_seropos_long <- gather(df_seropos, key = "Realization", value = "Output", -age)
-  
-  # Add a column to indicate the vaccine coverage for each dataset
-  df_total_long$poptype <- "All"
-  df_seroneg_long$poptype <- "Seronegative"
-  df_seropos_long$poptype <- "Seropositive"
-  
-  # Combine all datasets into one long dataframe
-  df_long <- bind_rows(df_total_long, df_seroneg_long, df_seropos_long)
-  
-  # Calculate the mean and 95% confidence interval for each age group and vaccine coverage
-  summary_df <- df_long %>%
-    group_by(age, poptype) %>%
-    summarise(
-      mean_output = mean(Output),
-      lower_bound = quantile(Output, 0.025),
-      upper_bound = quantile(Output, 0.975)
-    ) %>%
-    ungroup()
-  
-
-  # Define colors for different vaccine coverages
-  poptype_barcolors <- c("All" = "#8dd3c7", "Seronegative" = "#fdb462", "Seropositive" = "#b3de69")
-  
-  poptype_errorbar_colors <- c("All" = "#55a39b", "Seronegative" = "#e08d3e", "Seropositive" = "#85a84e")
-  
-  # Define the dodge position for side-by-side plotting
-  dodge <- position_dodge(width = 0.3)
-  
-  # Plot using ggplot2
-  p <- ggplot(summary_df, aes(x = factor(age), y = mean_output, fill = poptype)) +
-    # geom_point(size = 9, position = dodge, shape = 16) +  # Points for the mean with dodge
-    geom_bar(stat = "identity", position = position_dodge(width = 0.75), width = 0.65) +
-    
-    geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound, color = poptype),
-                  width = 0.0, size = 1.8, position = position_dodge(width = 0.75)) +
-    geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound),
-                  width = 0.0, size = 1.8, position = dodge) +  # Error bars with dodge
-    scale_fill_manual(values = poptype_barcolors, name = "") + # Custom colors for bars
-    scale_color_manual(values = poptype_errorbar_colors,  name = "") + # Custom colors for error bars
-    # scale_color_manual(values = poptype_colors, name = "") +
-    scale_x_discrete(
-      breaks = c(1, 2, 3, 4, 5, 6, 7),   # Set the positions of the x-axis ticks
-      labels = c("6-16", "17-30", "31-40", "41-50", "51-60", "61-70", "71-80")  # Labels for age groups
-    ) +
-    labs(x = "Age at vaccination", y = ylab, color = NULL) +  # Labels for x and y axes
-    scale_y_continuous(limits = y_limits, breaks = y_breaks) +  # Define y-axis tick points )+
-    theme_bw() +  # Clean theme
-    theme(
-      axis.ticks.length = unit(0.4, "cm"),        # Increase the length of the ticks
-      axis.ticks = element_line(size = 1.5),      # Increase the thickness of the ticks
-      panel.border = element_rect(color = "black", size = 2),  # Thicker border
-      plot.margin = margin(t=10, r=10, b=20, l=25),
-      axis.text.x = element_text(size = 35, color="black", angle= 30, margin = margin(t = 10, b = 20)),
-      axis.text.y = element_text(size = 35,color="black", margin = margin(r = 10, l = 30)),
-      # axis.title = element_text(size = 35, color = "black"),
-      axis.title = element_blank(),
-      legend.position = "top",
-      legend.direction = "horizontal",
-      legend.text = element_text(size = 40),
-      legend.key.size = unit(2, "cm"),  # Increase size of legend keys
-      legend.key.height = unit(1.5, "cm"),  # Increase height of legend keys
-      legend.key.width = unit(2.5, "cm"),  # Increase width of legend keys
-      legend.background = element_blank()
-    )
-  
-   return(list(plot = p, summary = summary_df))
-  
-}
-
-
-get_arranged_plot_inci_serostatus <- function(set_of_rds_files, variable_name, y_lab, t_begin, t_end) {
-  
-  plot_list <- list()
-  summary_list <- list()
-  
-  for (i in seq_along(set_of_rds_files)) {
-    
-    rds_files <- set_of_rds_files[[i]]
-    
-    ## for total population
-    nv_total <- extract_variable(rds_file = rds_files[1] , 
-                            variable_name = variable_name) + 
-      extract_variable(rds_file =  rds_files[1], 
-                       variable_name = paste0(variable_name, "_v"))
-    
-    ## seronegative
-    nv_seroneg <- extract_variable(rds_file = rds_files[1] , 
-                                 variable_name = paste0(variable_name, "_primary")) + 
-      extract_variable(rds_file =  rds_files[1], 
-                       variable_name = paste0(variable_name, "_v_primary"))
-    
-    ## seropositive
-    nv_seropos <- extract_variable(rds_file = rds_files[1] , 
-                                   variable_name = paste0(variable_name, "_secondary")) + 
-      extract_variable(rds_file =  rds_files[1], 
-                       variable_name = paste0(variable_name, "_v_secondary"))
-    
-    
-    inci_serostatus_total <- get_inci_serostatus(output = nv_total,
-                                                 t_begin = t_begin,
-                                                 t_end = t_end)
-    
-    
-    inci_serostatus_seroneg <- get_inci_serostatus(output = nv_seroneg,
-                                                   t_begin = t_begin,
-                                                   t_end = t_end)
-    
-    inci_serostatus_seropos <- get_inci_serostatus(output = nv_seropos,
-                                                   t_begin = t_begin,
-                                                   t_end = t_end)
-    
-    df_inci_serostatus_total <- as.data.frame(inci_serostatus_total)
-    
-    df_inci_serostatus_seroneg <- as.data.frame(inci_serostatus_seroneg)
-    
-    df_inci_serostatus_seropos <- as.data.frame(inci_serostatus_seropos)
-   
-    
-    
-    # Determine y-axis settings for this figure
-    if (i == 1 ) {  # Example: The second figure requires different limits
-      y_limits <- custom_y_limits1
-      y_breaks <- custom_y_breaks1
-      
-    } else if (i == 2) {
-      y_limits <- custom_y_limits2
-      y_breaks <- custom_y_breaks2
-      
-    } else if (i == 3) {
-      y_limits <- custom_y_limits3
-      y_breaks <- custom_y_breaks3
-      
-    }  else if (i == 4) {
-      y_limits <- custom_y_limits4
-      y_breaks <- custom_y_breaks4
-    }
-    
-    
-  
-    result <- get_plot_inci_serostatus(
-      df_total = df_inci_serostatus_total,
-      df_seroneg = df_inci_serostatus_seroneg,
-      df_seropos = df_inci_serostatus_seropos,
-      y_limits = y_limits,
-      y_breaks = y_breaks)
-   
-    inci_plot_serostatus <- result$plot
-    
-    plot_list[[i]] <- inci_plot_serostatus
-    summary_list[[i]] <- result$summary
-    
-  }
-  
-
-  ## remove legend in each of the figure
-  plot_list_wo_legend <- list()
-  
-  for (i in seq_along(plot_list)) {
-    plot_list_wo_legend[[i]] <- plot_list[[i]] + theme(legend.position = "none")
-  }  
-  
-  ## extrct the legend  
-  legend_plot <- get_legend(inci_plot_serostatus)  
-  
-  # Create the grid of plots without individual x and y labels
-  plot_wo_labels <- plot_grid(
-    plotlist = plot_list_wo_legend,
-    nrow = 2,
-    ncol = 2,
-    align = "hv",
-    axis = "tblr",
-    labels = c("(a)", "(b)", "(c)", "(d)"),  # Add subfigure labels
-    label_size = 40,                        # Adjust label size
-    label_x = 0.03,                         # Adjust horizontal position of labels
-    label_y = 1.08                          # Adjust vertical position of labels
-  )
-  
-  plot_with_labels <- ggdraw() +
-    draw_plot(plot_wo_labels, x = 0, y = 0, width = 1, height = 1) +   
-    draw_label(y_lab, x = 0.01, y = 0.55, angle = 90, size = 45, fontface = "bold") +  # Y-axis label
-    draw_label("Age at vaccination (year)", x = 0.5, y = 0.025, angle = 0, size = 45, fontface = "bold")           # X-axis label
-  
-  # make grid of plots  
-  final_plot_with_legend <- plot_grid(
-    legend_plot,
-    plot_with_labels,
-    nrow = 2, 
-    rel_heights = c(0.1,1)  
-  )
-  
-  return(final_plot_with_legend)
-  
-}  
-
-
-### Inputs
-## List all the datasets that we want to plot together
-set_of_rds_files <- list(
-  c("pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds"),  # Set 1
-
-  c("pri_sec_neq_detailed_a7_sero_dom_denv2_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds"),  # Set 2
-
-  c("pri_sec_neq_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds"),  # Set 3
-
-  c("pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds")    # Set 4
-)
-
-
-## grab the start of vaccination year from one of the dataset
-t_begin = readRDS(here::here("model_output",set_of_rds_files[[1]][1]) )$v_year 
-
-custom_y_limits1 <- c(0, NA)
-custom_y_breaks1 <- seq(0, 25, by = 5)
-
-
-custom_y_limits2 <- c(0, NA)
-custom_y_breaks2 <- seq(0, 25, by = 5)
-
-# Custom y-axis settings for a specific figure (for negative impact)(change it accordingly)
-custom_y_limits3 <- c(0, NA)
-custom_y_breaks3 <- seq(0, 25, by = 5)
-
-custom_y_limits4 <- c(0, NA)
-custom_y_breaks4 <- seq(0, 25, by = 5)
-
-
-age_list <- get_age_list(rds_file = set_of_rds_files[[1]][1])
-
-## Generate figure now
-plot_impact <- get_arranged_plot_inci_serostatus(set_of_rds_files = set_of_rds_files,
-                                                                    variable_name = "hosp_sample_age",
-                                                                    y_lab = "Infection",
-                                                                    t_begin = t_begin,
-                                                                    t_end = t_begin + 9)
-
-figure_name <- "abs_infection_baseline_scenario.jpg"
-
-## save
-ggsave(
-  filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
-  plot = plot_impact,                                            # The plot object to save
-  width = 29*2,                                           # Width in inches
-  height = 40,                                          # Height in inches
-  dpi = 300,
-  units = "cm")                                  # DPI (resolution)
-
-
 ```
-
 

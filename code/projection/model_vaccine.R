@@ -101,68 +101,6 @@ vac_R[2:n_age] <- if (prescreening == 1) vac_R_scrng[i] else
   vac_R_no_scrng[i]
 
 
-## test_sensitivity == sensitivity of test for dengue: for scenario o vaccinating only seropositive
-
-## number of vaccinated when there is a screening
-# vac_Sall_scrng[] <- if (as.integer(t) >= vac_start) (1/365)*(1 - test_specifi)*vac_switch[i]*test_coverage*S_all[i] else 0
-# 
-# vac_C_scrng[,] <- if (as.integer(t) >= vac_start) (1/365)*(test_sensiti)*vac_switch[i]*test_coverage*C[i,j] else 0
-# 
-# vac_S_scrng[,] <- if (as.integer(t) >= vac_start) (1/365)*(test_sensiti)*vac_switch[i]*test_coverage*S[i,j] else 0
-# 
-# vac_R_scrng[] <- if (as.integer(t) >= vac_start) (1/365)*(test_sensiti)*vac_switch[i]*test_coverage*R[i] else 0
-# 
-# 
-# vac_Sall_non_sero_scrng[] <- if (as.integer(t) >= vac_start) (1/365)*vac_switch[i]*test_coverage*S_all[i]*( ((1 - test_specifi)*S_all[i] + test_sensiti*(sum(C[i,]) + sum(S[i,]) + R[i]))/elig_vac_age[i] ) else 0
-# vac_C_non_sero_scrng[,] <- if (as.integer(t) >= vac_start) (1/365)*vac_switch[i]*test_coverage*C[i,j]*( ((1 - test_specifi)*S_all[i] + test_sensiti*(sum(C[i,]) + sum(S[i,]) + R[i]))/elig_vac_age[i] ) else 0
-# vac_S_non_sero_scrng[,] <- if (as.integer(t) >= vac_start) (1/365)*vac_switch[i]*test_coverage*S[i,j]*( ((1 - test_specifi)*S_all[i] + test_sensiti*(sum(C[i,]) + sum(S[i,]) + R[i]))/elig_vac_age[i] ) else 0
-# vac_R_non_sero_scrng[] <- if (as.integer(t) >= vac_start) (1/365)*vac_switch[i]*test_coverage*R[i]*( ((1 - test_specifi)*S_all[i] + test_sensiti*(sum(C[i,]) + sum(S[i,]) + R[i]))/elig_vac_age[i] ) else 0
-# 
-# ########### without pre screening criteria
-# ## calculate the number of vaccinated for different compartments and introduce vaccination timing
-# vac_Sall_no_scrng[1] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S_all[i]/elig_vac_age[i] else
-#   vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(S_all[i]/elig_vac_age[i])
-# 
-# vac_Sall_no_scrng[2:n_age] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S_all[i]/elig_vac_age[i] else
-#   vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(S_all[i]/elig_vac_age[i])
-# 
-# vac_C_no_scrng[1,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*C[i,j]/elig_vac_age[i] else
-#   vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(C[i,j]/elig_vac_age[i])
-# 
-# vac_C_no_scrng[2:n_age,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*C[i,j]/elig_vac_age[i] else
-#   vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(C[i,j]/elig_vac_age[i])
-# 
-# vac_S_no_scrng[1,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S[i,j]/elig_vac_age[i] else
-#   vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(S[i,j]/elig_vac_age[i])
-# 
-# vac_S_no_scrng[2:n_age,1:n_sero] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*S[i,j]/elig_vac_age[i] else
-#   vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(S[i,j]/elig_vac_age[i])
-# 
-# vac_R_no_scrng[1] <-  if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*R[i]/elig_vac_age[i] else
-#   vac_switch[i]*(lambda_hum*N*N_v_age[i]/N_age[i])*(R[i]/elig_vac_age[i])
-# 
-# vac_R_no_scrng[2:n_age] <- if (as.integer(t) == vac_start) vac_switch[i]*vac_coverage*N_age[i]*R[i]/elig_vac_age[i] else
-#   vac_switch[i]*(age_rate[i - 1]*(N_age[i - 1]*N_v_age[i] - N_v_age[i - 1]*N_age[i])/N_age[i])*(R[i]/elig_vac_age[i])
-# 
-# 
-# ###### now switch based on the model run
-# ## calculate the number of vaccinated for different compartments and introduce vaccination timing
-# vac_Sall[] <- if (prescreening == 1 && prescreening_non_sero == 0) vac_Sall_scrng[i] else
-#   if (prescreening == 1 && prescreening_non_sero == 1) vac_Sall_non_sero_scrng[i] else 
-#     if (prescreening == 0) vac_Sall_no_scrng[i] else 0
-# 
-# vac_C[,] <- if (prescreening == 1 && prescreening_non_sero == 0) vac_C_scrng[i,j] else
-#   if (prescreening == 1 && prescreening_non_sero == 1) vac_C_non_sero_scrng[i,j] else 
-#     if (prescreening == 0) vac_C_no_scrng[i,j] else 0
-# 
-# vac_S[,] <- if (prescreening == 1 && prescreening_non_sero == 0) vac_S_scrng[i,j] else
-#   if (prescreening == 1 && prescreening_non_sero == 1) vac_S_non_sero_scrng[i,j] else 
-#     if (prescreening == 0) vac_S_no_scrng[i,j] else 0
-# 
-# vac_R[] <- if (prescreening == 1 && prescreening_non_sero == 0) vac_R_scrng[i] else
-#   if (prescreening == 1 && prescreening_non_sero == 1) vac_R_non_sero_scrng[i] else 
-#     if (prescreening == 0) vac_R_no_scrng[i] else 0
-
 
 #### importation
 import[1:n_sero] <- if (as.integer(t) >= import_start && as.integer(t) <= import_end) n_import else 0
