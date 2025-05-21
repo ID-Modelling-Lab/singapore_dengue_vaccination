@@ -1,6 +1,0 @@
-ring_buffer_bytes       Byte array based ring buffer
-ring_buffer_bytes_translate
-                        Translating bytes ring buffer
-ring_buffer_bytes_typed
-                        Typed bytes ring buffer
-ring_buffer_env         Environment-based ring buffer
