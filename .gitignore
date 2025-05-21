@@ -3,6 +3,8 @@
 /code/model_output/*
 /code/others/*
 /Draft/*
+/code/renv/*
+/code/renv.lock/
 /code/figure/old/*
 /code/figure/poster/*
 /code/figure/hosp_rate_scenario/*
@@ -13,3 +15,4 @@
 .Rhistory
 .RData
 .Ruserdata
+.renv.lock

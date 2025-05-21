@@ -12,7 +12,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 ### call all the libraries
-
 library(dust)
 library(mcstate)
 library(odin.dust)
@@ -22,7 +21,7 @@ library(here)
 # library(ggpubr)
 library(dplyr)
 # library(imputeTS)
- library(latex2exp)
+library(latex2exp)
 library(ggpubr)
 ```
 

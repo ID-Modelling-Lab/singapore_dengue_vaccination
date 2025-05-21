@@ -4277,7 +4277,7 @@ plot_impact_hosp_dominating_sero <- get_arranged_plot_avert_percent(set_of_rds_f
                                                        t_begin = t_begin,
                                                        t_end = t_begin + 9)
 
-figure_name <- "sensitivity_reporting_rate_symp_wo_waning.jpg"
+figure_name <- "sensitivity_reporting_rate_symp.jpg"
 
 # ## save
 ggsave(
@@ -4649,7 +4649,7 @@ plot_impact_hosp_dominating_sero <- get_arranged_plot_avert_percent(set_of_rds_f
                                                        t_begin = t_begin,
                                                        t_end = t_begin + 9)
 
-figure_name <- "sensitivity_reporting_rate_hosp_wo_waning.jpg"
+figure_name <- "sensitivity_reporting_rate_hosp.jpg"
 
 # ## save
 ggsave(
@@ -4677,30 +4677,236 @@ df_efficacy <- get_raw_ve_from_trial(excel_efficacy = excel_efficacy)
 # Make sure factor levels are ordered correctly
 df_plot <- df_efficacy %>%
   mutate(
-    group1 = factor(group1, levels = c("DENV1", "DENV2", "DENV3", "DENV4")),
+    group1 = factor(group1, levels = c("DENV1", "DENV2", "DENV3", "DENV4"),
+                            labels = c("DENV-1", "DENV-2", "DENV-3", "DENV-4")),
     group2 = factor(group2, levels = c("Sero+", "Sero-")),
     group3 = factor(group3, levels = c("VCD", "Hospitalized"))
   )
 # Create the plot with facet_wrap
-ggplot(df_plot, aes(x = group1,  y = ve, color = group3)) +
-    geom_line(show.legend = FALSE, lwd = 1, lty = 1) +
-  geom_point(show.legend = FALSE, size=3) +
+p <- ggplot(df_plot, aes(x = group1,  y = ve, color = group3)) +
+  geom_point(show.legend = FALSE, size = 9) +
   geom_errorbar(aes(ymin = ve_low, ymax = ve_up),
                 width = 0.2,
-                size = 1,
+                size = 1.8,
                 show.legend = FALSE) +
   geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
   facet_wrap(~ group3 + group2, ncol = 2,  scales = "free_y") +
   scale_color_manual(values = c("VCD" = "#E74C3C", "Hospitalized" = "#00BFC4")) +
   xlab("Serotype") +
+  ylab("Vaccine efficacy") +
   theme_bw() +
   # coord_fixed(ratio = 1) +  # Adjust aspect ratio as needed
   theme(
-    plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
-    axis.text = element_text(size = 11),
-    axis.title = element_text(size = 12),
-    strip.text = element_text(size = 10)
+    axis.ticks.length = unit(0.4, "cm"),        # Increase the length of the ticks
+    axis.ticks = element_line(size = 1.5),      # Increase the thickness of the ticks
+    panel.border = element_rect(color = "black", size = 2),  # Thicker border
+    # plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    axis.text = element_text(size = 40,  color = "black"),
+    axis.title.x = element_text(size = 45, face = "bold",  color = "black"),
+    axis.title.y = element_text(size = 45, face = "bold",  color = "black"),
+    strip.text = element_text(size = 40,   color = "black"),
+    strip.background = element_rect(fill = "gray90", color = "black", size = 2)  # <-- border for strip
+
   )
+
+
+figure_name <- "cumulative_ve_estimates_from_trial.jpg"
+
+# ## save
+ggsave(
+  filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
+  plot = p,                                            # The plot object to save
+  width = 28*2,                                           # Width in inches
+  height = 40,                                          # Height in inches
+  dpi = 300,
+  units = "cm")                                  # DPI (resolution)
+
  
 ```
+
+## Model fititing associated diagnostics
+## Plot the trace plot
+```{r}
+posterior_chain = readRDS(here("fitting/fitting_output","posterior_rep_rate.rds"))
+
+# make it data frame
+df_chain = data.frame(posterior_chain)
+# Sample parameter labels as expressions
+param_labels <- c(
+  "rho_2_a1" = "rho[2]^'0-4y'",
+  "rho_2_a2" = "rho[2]^'5-14y'",
+  "rho_2_a3" = "rho[2]^'15-24y'",
+  "rho_2_a4" = "rho[2]^'25-34y'",
+  "rho_2_a5" = "rho[2]^'35-44y'",
+  "rho_2_a6" = "rho[2]^'45-54y'",
+  "rho_2_a7" = "rho[2]^'55-64y'",
+  "rho_2_a8" = "rho[2]^'65+y'"
+)
+
+# Add iteration index
+df_chain <- df_chain %>%
+  mutate(iteration = row_number())
+
+# Reshape to long format
+df_long <- df_chain %>%
+  pivot_longer(cols = starts_with("rho_2_a"),
+               names_to = "parameter", values_to = "value")
+
+# Assign expression labels
+df_long <- df_long %>%
+  mutate(
+    parameter_label = factor(param_labels[parameter], levels = param_labels)
+  )
+
+# Trace plot with expression parsing
+p <- ggplot(df_long, aes(x = iteration, y = value)) +
+  geom_line(color = "black", linewidth = 0.6) +
+  facet_wrap(~ parameter_label, ncol = 2, scales = "free_y", labeller = label_parsed) +
+  labs(x = "Iteration", y = "Parameter value") +
+  theme_bw() +
+  theme(
+     axis.ticks.length = unit(0.4, "cm"),        # Increase the length of the ticks
+    axis.ticks = element_line(size = 1.5),      # Increase the thickness of the ticks
+    panel.border = element_rect(color = "black", size = 2),  # Thicker border
+    # plot.title = element_text(hjust = 0.5, face = "bold", size = 16),
+    axis.text = element_text(size = 40,  color = "black"),
+    axis.title.x = element_text(size = 45, face = "bold",  color = "black"),
+    axis.title.y = element_text(size = 45, face = "bold",  color = "black"),
+    strip.text = element_text(size = 30,   color = "black"),
+    strip.background = element_rect(fill = "gray90", color = "black", size = 2)  # <-- border for strip
+
+  )
+
+figure_name <- "trace_plot.jpg"
+
+# ## save
+ggsave(
+  filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
+  plot = p,                                            # The plot object to save
+  width = 28*2,                                           # Width in inches
+  height = 40,                                          # Height in inches
+  dpi = 300,
+  units = "cm")   
+
+```
+
+
+## model fitting with data
+
+```{r}
+
+## model generated incidence from fitting
+Sampled_posterior_state <- readRDS(here("fitting/fitting_output","state.rds"))
+
+## read the reported incidence data (yearly)
+data_reported_age_yearly = read_xlsx(here("data","serotype_share_age_cases.xlsx" ), sheet="age_case_2014_20")
+
+# select the incidence per 100k data
+df_age_rep_inc <- select(data_reported_age_yearly, year,contains("_inc_") )
+
+reported_cases = df_age_rep_inc %>%
+  mutate(
+    day = c(365*(1:(length(df_age_rep_inc$year))))
+  )
+
+
+# since it's an array first get all the rownames with the function rownames
+row_names <- dimnames(Sampled_posterior_state)[[1]]
+
+# Now extract the rows with incidence
+inc_only_array <- Sampled_posterior_state[row_names[grepl("^inc[0-9]+", row_names)],,]
+
+## average over time for each of the realizations
+mean_inc <- apply(inc_only_array[, , 2:8], c(1, 2), mean)
+
+# function to calculate quantiles
+calculate_quantiles <- function(matrix_data, probs = c(0.05, 0.5, 0.95)) {
+  apply(matrix_data, 1, quantile, probs = probs, na.rm = TRUE)
+}
+
+# incidence with median and 95% credible interval for each of the age groups
+inc_with_uncertainty <- calculate_quantiles(mean_inc)
+
+## before plotting arrange the data
+df_long <- df_age_rep_inc %>%
+  pivot_longer(
+    cols = -year,
+    names_to = "age_group",
+    values_to = "incidence"
+  ) %>%
+  mutate(
+    age_group = gsub("_inc_p_100k", "", age_group)
+  )
+
+# Convert to data frame and add quantile as a column
+df_model <- as.data.frame(t(inc_with_uncertainty))
+colnames(df_model) <- c("q5", "q50", "q95")
+
+age_levels <- c("0-4", "5-14", "15-24", "25-34", "35-44", "45-54", "55-64", "65+")
+
+# Apply to both dataframes
+df_model$age_group <- c("0-4", "5-14", "15-24", "25-34", "35-44", "45-54", "55-64", "65+")
+
+df_long$age_group <- factor(df_long$age_group, levels = age_levels)
+df_model$age_group <- factor(df_model$age_group, levels = age_levels)
+
+df_long$source <- "Data"
+df_model$source <- "Model"
+
+p <- ggplot() +
+    geom_line(data = df_long,
+            aes(x = age_group, y = incidence, group = year, color = "Data"),
+            size = 3, alpha = 0.6) +
+
+  # Model ribbon
+  geom_ribbon(data = df_model,
+              aes(x = age_group, ymin = q5, ymax = q95, group = 1), fill = "#1B9E77", alpha = 0.3) +
+
+  # Model median line
+  geom_line(data = df_model,
+            aes(x = age_group, y = q50, color = "Model", group = 1),
+            size = 3) +
+  labs(
+    x = "Age group (year)",
+    y = "Dengue incidence per 100000 population",
+    color = "source"
+  ) +
+  scale_color_manual(values = c("Data" = "gray60", "Model" = "#1B9E77"), name = "") +
+  scale_fill_manual(values = c("Model" = "#1B9E77"), name = "") +
+  scale_y_continuous(limits = c(0,800), breaks =  seq(0, 800, by = 100)) +  
+   # scale_x_discrete(
+   #    breaks = c(1, 2, 3, 4, 5, 6, 7, 8),   # Set the positions of the x-axis ticks
+   #    labels = c("0-4", "5-14", "15-24", "25-34", "35-44", "45-54", "55-64", "65+")  # Labels for age groups# Labels for age groups
+   #  ) +
+  theme_bw() +
+  theme(
+    axis.ticks.length = unit(0.4, "cm"),        # Increase the length of the ticks
+    axis.ticks = element_line(size = 1.5),      # Increase the thickness of the ticks
+    panel.border = element_rect(color = "black", size = 2),  # Thicker border
+    axis.text.x = element_text(size = 40, angle = 30, color = "black",  margin = margin(t = 10, b = 10)),
+    axis.text.y = element_text(size = 40, angle = 0, color = "black"),
+    axis.title.x = element_text(size = 45,  face = "bold",  color = "black"),
+    axis.title.y = element_text(size = 45, face = "bold",  color = "black"),
+    legend.title = element_text(size = 35, face = "bold"),
+    legend.text = element_text(size = 45, color = "black"),
+    legend.key.size = unit(2, "cm"),
+    legend.position = c(0.8, 0.65)
+
+
+  )
+
+
+figure_name <- "model_fitting.jpg"
+
+# ## save
+ggsave(
+  filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
+  plot = p,                                            # The plot object to save
+  width = 50,                                           # Width in inches
+  height = 40,                                          # Height in inches
+  dpi = 300,
+  units = "cm")   
+
+```
+
 
