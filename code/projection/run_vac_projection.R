@@ -54,37 +54,37 @@ source(here("utils","utils_aggregated.R"))
 ####### (uncomment chunk below if want to run on HPC ot in commandline) #######
 ###### ### Accept command-line arguments 
 
-# args <- commandArgs(trailingOnly = TRUE)
-# 
-# # # Assign values from command-line arguments, if provided
-# if (length(args) >= 1) {
-#   baseline <- args[1]  # First argument: baseline
-# }
-# if (length(args) >= 2) {
-#   v_coverage <- as.numeric(args[2])  # Second argument: coverage
-# }
-# 
-# ### Check for valid inputs
-# if (!baseline %in% c("yes", "no")) {
-#   stop("Invalid value for baseline. Must be 'yes' or 'no'.")
-# }
-# if (is.na(v_coverage) || v_coverage < 0 || v_coverage > 1) {
-#   stop("Invalid value for v_coverage. Must be a number between 0 and 1.")
-# }
-# 
-# cat("Running simulation with parameters:\n")
-# cat("baseline =", baseline, "\n")
-# cat("v_coverage =", v_coverage, "\n")
+args <- commandArgs(trailingOnly = TRUE)
+
+# # Assign values from command-line arguments, if provided
+if (length(args) >= 1) {
+  baseline <- args[1]  # First argument: baseline
+}
+if (length(args) >= 2) {
+  v_coverage <- as.numeric(args[2])  # Second argument: coverage
+}
+
+### Check for valid inputs
+if (!baseline %in% c("yes", "no")) {
+  stop("Invalid value for baseline. Must be 'yes' or 'no'.")
+}
+if (is.na(v_coverage) || v_coverage < 0 || v_coverage > 1) {
+  stop("Invalid value for v_coverage. Must be a number between 0 and 1.")
+}
+
+cat("Running simulation with parameters:\n")
+cat("baseline =", baseline, "\n")
+cat("v_coverage =", v_coverage, "\n")
 ################################################################################
 ################################################################################
 
 # Comment(Uncomment) below chuck if want to run on HPC(Locally) resp.)
 ################################################################################
 ## Vaccination scenario: 
-baseline <- "yes"
-
-## Vaccination coverage
-v_coverage <- 0.8
+# baseline <- "yes"
+# 
+# ## Vaccination coverage
+# v_coverage <- 0.8
 ################################################################################
 ## this for gathering demographic data from singstat
 begin_year = "2013"
@@ -149,11 +149,23 @@ v_a = matrix( c(7,17,
                 72,81
 ), nrow = 7, ncol = 2, byrow = TRUE)
 
-## number vaccine coverage scenarios
-n_vac_coverage = length(v_coverage)
 
-## number of vaccinated age-groups
-n_vac_age = dim(v_a)[1]
+### This os for alternative age groups for supplementary
+# v_a = matrix( c(7,17,
+#                 18,31,
+#                 32,61,
+#                 31,90,
+#                 41,90,
+#                 51,90,
+#                 61,90
+# ), nrow = 7, ncol = 2, byrow = TRUE)
+# 
+# 
+# ## number vaccine coverage scenarios
+# n_vac_coverage = length(v_coverage)
+# 
+# ## number of vaccinated age-groups
+# n_vac_age = dim(v_a)[1]
 
 ################################################################################
 # rate of waning per year from baseline values of VE (default model run it is 0)
@@ -176,13 +188,22 @@ n_sero <- 4
 ################################################################################
 ## efficacy estimates for Dengvaxia (Uncomment the non-zero estimates for running 
 ### the scenario with efficacy of infection)
-ve_inf_sero_n_low = 0 #-0.359
-ve_inf_sero_n_up = 0 #0.388
-ve_inf_sero_n_pt = 0 #0.093
-ve_inf_sero_p_low = 0 #0.352
-ve_inf_sero_p_up = 0 #0.585
-ve_inf_sero_p_pt = 0 #0.481
+# ve_inf_sero_n_low = 0 #-0.359
+# ve_inf_sero_n_up = 0 #0.388
+# ve_inf_sero_n_pt = 0 #0.093
+# ve_inf_sero_p_low = 0 #0.352
+# ve_inf_sero_p_up = 0 #0.585
+# ve_inf_sero_p_pt = 0 #0.481
 ################################################################################
+
+## sensitivity analysis with lower bound 0 
+
+ve_inf_sero_n_low = 0
+ve_inf_sero_n_up = 0.388
+ve_inf_sero_n_pt = 0.093
+ve_inf_sero_p_low = 0.352
+ve_inf_sero_p_up = 0.585
+ve_inf_sero_p_pt = 0.481
 
 ##### Demographic
 ## population in each age group in "begin_year"
@@ -804,7 +825,7 @@ saveRDS(list(coverage = v_coverage,
              v_year = v_year,
              v_age_list = v_a,
              output = results_list), 
-        file = here::here("model_output", paste0("try_pri_sec_neq_detailed_a7_sero_dom_", sero_domin, "_vcov_", v_coverage,"_baseline_", baseline,
+        file = here::here("model_output", paste0("effi_inf_lower_0_pri_sec_neq_detailed_a7_sero_dom_", sero_domin, "_vcov_", v_coverage,"_baseline_", baseline,
                                                  "_nsamp_", n_sample,"_waning_", waning,"_prescrng_", prescreening, ".rds" )))
 
 

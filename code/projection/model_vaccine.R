@@ -452,7 +452,7 @@ import_end <- user()
 ## fixed parameters
 # scalar valued
 prescreening <- user()
-# prescreening_non_sero <- user()
+
 test_sensiti <- user()
 test_specifi <- user()
 # test_coverage <- user()

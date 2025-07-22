@@ -14,8 +14,9 @@ get_sero_p <- function(sero_year){
                                        age = age)
   sero_p <- seroprevalence[1,]
   primary <- seroprevalence[3,]
+  secondary <- seroprevalence[4,]
 
-  return(list(se_p = sero_p, pri = primary))
+  return(list(se_p = sero_p, pri = primary, sec = secondary))
 }
 
 
