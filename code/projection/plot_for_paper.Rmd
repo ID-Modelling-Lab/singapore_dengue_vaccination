@@ -369,7 +369,6 @@ ggsave(
 
 
 ## Percentage of hospitalization averted for 3 vaccine coverage
-
 ```{r}
 ## aggregate over all the age groups
 get_agg_over_age <- function(arr) {
@@ -717,8 +716,435 @@ ggsave(
 
 
 
-## Percentage of Cases averted stratified with baseline serostatus
 
+
+## Percentage of cases averted for 3 vaccine coverage (cases and hospitalization plotted together)
+```{r}
+## aggregate over all the age groups
+get_agg_over_age <- function(arr) {
+  arr_agg_age <- apply(arr, c(1,2,4), sum)
+  return(arr_agg_age)
+}
+
+## cumulative number over year
+get_cumulative_over_time <- function(arr, t_begin, t_end) {
+  arr_cum_time <- apply(arr[, , t_begin:t_end], c(1, 2), sum)
+  return(arr_cum_time)
+}
+
+## calculate the averted 
+get_averted <- function(nv_output, v_output, t_begin, t_end, output_type){
+  
+  nv_agg_age <- get_agg_over_age(nv_output)
+  v_agg_age <-  get_agg_over_age(v_output)
+  
+  nv_cum_t <- get_cumulative_over_time( nv_agg_age, t_begin = t_begin, t_end = t_end)
+  v_cum_t <- get_cumulative_over_time( v_agg_age, t_begin = t_begin, t_end = t_end)
+  
+  if (output_type == "absolute") {
+    
+    averted <- (nv_cum_t - v_cum_t)
+  }
+  
+  if (output_type == "proportion") {
+    
+    averted <- 100*(nv_cum_t - v_cum_t)/nv_cum_t
+  }
+  
+  return(averted)
+}
+
+## extract variable from .rds file
+extract_variable <- function(rds_file, variable_name) {
+  
+  result <- readRDS(here::here("model_output",  rds_file) )
+  
+  out_v <- as.data.frame(result$output, stringsAsFactors = FALSE)
+  
+  n_vac_age = result$n_vac_age
+  n_sample = result$n_sample
+  n_age = result$n_age
+  n_year = result$n_year
+  
+  x <- out_v[,colnames(out_v) == variable_name] 
+  
+  y <- array(NA, dim = c(n_vac_age,n_sample, n_age, n_year))
+  
+  for (i in 1:n_vac_age) {
+    
+    y[i,,,] <- x[[paste0("result.", i)]]
+  }
+  
+  return(y)
+}
+
+## make single figure
+get_plot_averted <- function(df_v20, df_v50, df_v80, y_limits, y_breaks) {
+  
+  # Add a column for age groups
+  df_v20$age <- 1:nrow(df_v20)
+  df_v50$age <- 1:nrow(df_v50)
+  df_v80$age <- 1:nrow(df_v80)
+  
+  # Reshape the dataframes to long format
+  df_v20_long <- gather(df_v20, key = "Realization", value = "Output", -age)
+  df_v50_long <- gather(df_v50, key = "Realization", value = "Output", -age)
+  df_v80_long <- gather(df_v80, key = "Realization", value = "Output", -age)
+  
+  # Add a column to indicate the vaccine coverage for each dataset
+  df_v20_long$VaccineCoverage <- "20% Coverage"
+  df_v50_long$VaccineCoverage <- "50% Coverage"
+  df_v80_long$VaccineCoverage <- "80% Coverage"
+  
+  # Combine all datasets into one long dataframe
+  df_long <- bind_rows(df_v20_long, df_v50_long, df_v80_long)
+  
+  # Calculate the mean and 95% confidence interval for each age group and vaccine coverage
+  summary_df <- df_long %>%
+    group_by(age, VaccineCoverage) %>%
+    summarise(
+      mean_output =  quantile(Output, 0.5), #mean(Output),
+      lower_bound = quantile(Output, 0.025),
+      upper_bound = quantile(Output, 0.975)
+    ) %>%
+    ungroup()
+
+  # 
+  
+  # Define colors for different vaccine coverages
+  vaccine_colors <- c("20% Coverage" = "#1b7a53", "50% Coverage" = "#d94e28", "80% Coverage" = "#4a5a92")
+  
+  # Define the dodge position for side-by-side plotting
+  dodge <- position_dodge(width = 0.3)
+  
+  # Plot using ggplot2
+  p <- ggplot(summary_df, aes(x = factor(age), y = mean_output, color = VaccineCoverage)) +
+    geom_point(size = 9, position = dodge, shape = 16) +  # Points for the mean with dodge
+    geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound), 
+                  width = 0.0, size = 1.8, position = dodge) +  # Error bars with dodge
+    scale_color_manual(values = vaccine_colors, name = "") + 
+    scale_x_discrete(
+      breaks = c(1, 2, 3, 4, 5, 6, 7),   # Set the positions of the x-axis ticks
+      labels = c("6-16", "17-30", "31-40", "41-50", "51-60", "61-70", "71-80")  # Labels for age groups
+    ) +
+    # labs(x = "Age at vaccination", y = ylab, color = NULL) +  # Labels for x and y axes
+    scale_y_continuous(limits = y_limits, breaks = y_breaks) +  # Define y-axis tick points )+
+    theme_bw() +  # Clean theme
+    theme(
+      axis.ticks.length = unit(0.4, "cm"),        # Increase the length of the ticks
+      axis.ticks = element_line(size = 1.5),      # Increase the thickness of the ticks
+      panel.border = element_rect(color = "black", size = 2),  # Thicker border
+      plot.margin = margin(t=10, r=10, b=20, l=25),
+      axis.text.x = element_text(size = 35, color="black", angle= 30, margin = margin(t = 10, b = 20)),
+      axis.text.y = element_text(size = 35,color="black", margin = margin(r = 10, l = 30)),
+      # axis.title = element_text(size = 35, color = "black"),
+      axis.title = element_blank(),
+      legend.position = "top",
+      legend.direction = "horizontal",
+      legend.text = element_text(size = 40),
+      legend.key.size = unit(2, "cm"),  # Increase size of legend keys
+      legend.key.height = unit(1.5, "cm"),  # Increase height of legend keys
+      legend.key.width = unit(2.5, "cm"),  # Increase width of legend keys
+      legend.background = element_blank()
+    )
+  
+  return(list(plot = p, summary = summary_df))
+  
+}
+
+
+get_arranged_plot_avert_percent_combined <- function(set_of_rds_files, variable_name1, variable_name2, y_lab1, y_lab2, t_begin, t_end) {
+  
+  plot_list_cases <- list()
+  plot_list_hosp <- list()
+
+  for (i in seq_along(set_of_rds_files)) {
+    
+    rds_files <- set_of_rds_files[[i]]
+    
+    v_0_cases <- extract_variable(rds_file = rds_files[1] , 
+                            variable_name = variable_name1) + 
+      extract_variable(rds_file =  rds_files[1], 
+                       variable_name = paste0(variable_name1, "_v"))
+    
+    v_20_cases <- extract_variable(rds_file = rds_files[2] , 
+                             variable_name = variable_name1) + 
+      extract_variable(rds_file =  rds_files[2], 
+                       variable_name = paste0(variable_name1, "_v"))
+    
+    v_50_cases <- extract_variable(rds_file = rds_files[3] , 
+                             variable_name = variable_name1) + 
+      extract_variable(rds_file =  rds_files[3], 
+                       variable_name = paste0(variable_name1, "_v"))
+    
+    v_80_cases <- extract_variable(rds_file = rds_files[4] , 
+                             variable_name = variable_name1) + 
+      extract_variable(rds_file =  rds_files[4], 
+                       variable_name = paste0(variable_name1, "_v"))
+    
+    
+    
+    averted_inc_v20_cases <- get_averted(nv_output = v_0_cases,
+                                   v_output = v_20_cases,
+                                   t_begin = t_begin,
+                                   t_end = t_end,
+                                   output_type = "proportion")
+    
+    averted_inc_v50_cases <- get_averted(nv_output = v_0_cases,
+                                   v_output = v_50_cases,
+                                   t_begin = t_begin,
+                                   t_end = t_end,
+                                   output_type = "proportion")
+    
+    averted_inc_v80_cases <- get_averted(nv_output = v_0_cases,
+                                   v_output = v_80_cases,
+                                   t_begin = t_begin,
+                                   t_end = t_end,
+                                   output_type = "proportion")
+    
+    
+    df_v20_cases <- as.data.frame(averted_inc_v20_cases)
+    df_v50_cases <- as.data.frame(averted_inc_v50_cases)
+    df_v80_cases <- as.data.frame(averted_inc_v80_cases)
+    
+    
+    
+  # Determine y-axis settings for this figure
+    if (i == 1 ) {  # Example: The second figure requires different limits
+      y_limits <- custom_y_limits1_cases
+      y_breaks <- custom_y_breaks1_cases
+      
+    } else if (i == 2) {
+      y_limits <- custom_y_limits2_cases
+      y_breaks <- custom_y_breaks2_cases
+      
+    } else if (i == 3) {
+      y_limits <- custom_y_limits3_cases
+      y_breaks <- custom_y_breaks3_cases
+      
+    }  else if (i == 4) {
+      y_limits <- custom_y_limits4_cases
+      y_breaks <- custom_y_breaks4_cases
+    }
+
+    
+    result_cases <- get_plot_averted(df_v20 = df_v20_cases , df_v50 = df_v50_cases, df_v80 = df_v80_cases, 
+                                     y_limits = y_limits, y_breaks = y_breaks )
+    
+    averted_plot_cases <- result_cases$plot
+    plot_list_cases[[i]] <- averted_plot_cases
+    
+  }
+  
+### Now for hospitalizations  
+  
+   for (i in seq_along(set_of_rds_files)) {
+    
+    rds_files <- set_of_rds_files[[i]]
+    
+    v_0_hosp <- extract_variable(rds_file = rds_files[1] , 
+                            variable_name = variable_name2) + 
+      extract_variable(rds_file =  rds_files[1], 
+                       variable_name = paste0(variable_name2, "_v"))
+    
+    v_20_hosp <- extract_variable(rds_file = rds_files[2] , 
+                             variable_name = variable_name2) + 
+      extract_variable(rds_file =  rds_files[2], 
+                       variable_name = paste0(variable_name2, "_v"))
+    
+    v_50_hosp <- extract_variable(rds_file = rds_files[3] , 
+                             variable_name = variable_name2) + 
+      extract_variable(rds_file =  rds_files[3], 
+                       variable_name = paste0(variable_name2, "_v"))
+    
+    v_80_hosp <- extract_variable(rds_file = rds_files[4] , 
+                             variable_name = variable_name2) + 
+      extract_variable(rds_file =  rds_files[4], 
+                       variable_name = paste0(variable_name2, "_v"))
+    
+    averted_inc_v20_hosp <- get_averted(nv_output = v_0_hosp,
+                                   v_output = v_20_hosp,
+                                   t_begin = t_begin,
+                                   t_end = t_end,
+                                   output_type = "proportion")
+    
+    averted_inc_v50_hosp <- get_averted(nv_output = v_0_hosp,
+                                   v_output = v_50_hosp,
+                                   t_begin = t_begin,
+                                   t_end = t_end,
+                                   output_type = "proportion")
+    
+    averted_inc_v80_hosp <- get_averted(nv_output = v_0_hosp,
+                                   v_output = v_80_hosp,
+                                   t_begin = t_begin,
+                                   t_end = t_end,
+                                   output_type = "proportion")
+    
+    
+    df_v20_hosp <- as.data.frame(averted_inc_v20_hosp)
+    df_v50_hosp <- as.data.frame(averted_inc_v50_hosp)
+    df_v80_hosp <- as.data.frame(averted_inc_v80_hosp)
+    
+    
+    
+  # Determine y-axis settings for this figure
+    if (i == 1 ) {  # Example: The second figure requires different limits
+      y_limits <- custom_y_limits1_hosp
+      y_breaks <- custom_y_breaks1_hosp
+      
+    } else if (i == 2) {
+      y_limits <- custom_y_limits2_hosp
+      y_breaks <- custom_y_breaks2_hosp
+      
+    } else if (i == 3) {
+      y_limits <- custom_y_limits3_hosp
+      y_breaks <- custom_y_breaks3_hosp
+      
+    }  else if (i == 4) {
+      y_limits <- custom_y_limits4_hosp
+      y_breaks <- custom_y_breaks4_hosp
+    }
+
+    
+    result_hosp <- get_plot_averted(df_v20 = df_v20_hosp, df_v50 = df_v50_hosp, df_v80 = df_v80_hosp, 
+                                     y_limits = y_limits, y_breaks = y_breaks )
+    
+    averted_plot_hosp <- result_hosp$plot
+    plot_list_hosp[[i]] <- averted_plot_hosp
+    
+
+    
+  }
+  
+  
+  ### combine the plots
+  plot_list <- c(plot_list_cases, plot_list_hosp)
+  
+
+  
+## remove legend in each of the figure
+  plot_list_wo_legend <- list()
+  
+  for (i in seq_along(plot_list)){
+    plot_list_wo_legend[[i]] <- plot_list[[i]] + theme(legend.position = "none")
+  }  
+  
+## extrct the legend  
+legend_plot <- get_legend(averted_plot_cases)  
+
+# Create the grid of plots without individual x and y labels
+plot_wo_labels <- plot_grid(
+  plotlist = plot_list_wo_legend,
+  nrow = 4,
+  ncol = 2,
+  align = "hv",
+  axis = "tblr",
+  labels = c("(a)", "(b)", "(c)", "(d)", "(e)", "(f)", "(g)", "(h)"),  # Add subfigure labels
+  label_size = 40,                        # Adjust label size
+  label_x = 0.03,                         # Adjust horizontal position of labels
+  label_y = 1.08                          # Adjust vertical position of labels
+)
+
+plot_with_labels <- ggdraw() +
+  draw_plot(plot_wo_labels, x = 0, y = 0, width = 1, height = 1) +   
+  draw_label(y_lab1, x = 0.01, y = 0.78, angle = 90, size = 45, fontface = "bold") +  # Y-axis label for cases
+  draw_label(y_lab2, x = 0.01, y = 0.28, angle = 90, size = 45, fontface = "bold") +  # Y-axis label
+  
+  draw_label("Age at vaccination (year)", x = 0.5, y = 0.025, angle = 0, size = 45, fontface = "bold")           # X-axis label
+
+# make grid of plots  
+final_plot_with_legend <- plot_grid(
+  legend_plot,
+  plot_with_labels,
+  nrow = 2, 
+  rel_heights = c(0.1,1)  
+)
+
+return(final_plot_with_legend)
+  
+}  
+
+### Inputs
+## List all the datasets that we want to plot together
+set_of_rds_files <- list(
+  c("pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
+    "pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.2_baseline_no_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.5_baseline_no_nsamp_100_waning_0.rds", 
+    "pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds"),  # Set 1
+  
+  c("pri_sec_neq_detailed_a7_sero_dom_denv2_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
+    "pri_sec_neq_detailed_a7_sero_dom_denv2_vcov_0.2_baseline_no_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv2_vcov_0.5_baseline_no_nsamp_100_waning_0.rds", 
+    "pri_sec_neq_detailed_a7_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds"),  # Set 2
+  
+  c("pri_sec_neq_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
+    "pri_sec_neq_detailed_a7_sero_dom_denv3_vcov_0.2_baseline_no_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv3_vcov_0.5_baseline_no_nsamp_100_waning_0.rds", 
+    "pri_sec_neq_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_no_nsamp_100_waning_0.rds"),  # Set 3
+  
+  c("pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
+    "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.2_baseline_no_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.5_baseline_no_nsamp_100_waning_0.rds", 
+    "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0.rds")    # Set 4
+)
+
+## grab the start of vaccination year from one of the dataset
+t_begin = readRDS(here::here("model_output",set_of_rds_files[[1]][1]) )$v_year 
+
+custom_y_limits1_cases <- c(0, 15)
+custom_y_breaks1_cases <- seq(0, 15, by = 3)
+
+
+custom_y_limits2_cases <- c(0, 15)
+custom_y_breaks2_cases <- seq(0, 15, by = 3)
+
+# Custom y-axis settings for a specific figure (for negative impact)(change it accordingly)
+custom_y_limits3_cases <- c(0, 15)
+custom_y_breaks3_cases <- seq(0, 15, by = 3)
+
+custom_y_limits4_cases <- c(-18, 15)
+custom_y_breaks4_cases <- seq(-18, 15, by = 6)
+
+## for hosp
+custom_y_limits1_hosp <- c(0, 17)
+custom_y_breaks1_hosp <- seq(0, 15, by = 3)
+
+
+custom_y_limits2_hosp <- c(0, 17)
+custom_y_breaks2_hosp <- seq(0, 15, by = 3)
+
+# Custom y-axis settings for a specific figure (for negative impact)(change it accordingly)
+custom_y_limits3_hosp <- c(0, 17)
+custom_y_breaks3_hosp <- seq(0, 15, by = 3)
+
+custom_y_limits4_hosp <- c(-0.05, 17)
+custom_y_breaks4_hosp <- seq(0, 15, by = 3)
+
+
+
+## Generate figure now
+plot_impact <- get_arranged_plot_avert_percent_combined(set_of_rds_files = set_of_rds_files,
+                                                       variable_name1 = "symp_sample_age",
+                                                       variable_name2 = "hosp_sample_age",
+                                                       y_lab1 = "Reported cases averted (%)", 
+                                                       y_lab2 = "Hospitalizations averted (%)", 
+                                                       t_begin = t_begin,
+                                                       t_end = t_begin + 9) ## for 10 year impact
+
+figure_name <- "percent_averted_10_y_dom_sero_symp_hosp_combined.jpg"
+
+# ## save
+ggsave(
+  filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
+  plot = plot_impact,                                            # The plot object to save
+  width = 29*2,                                           # Width in inches
+  height = 80,                                          # Height in inches
+  dpi = 300,
+  units = "cm")                                  # DPI (resolution)
+```
+
+
+## Percentage of Cases averted stratified with baseline serostatus
 ```{r message=FALSE}
 get_agg_over_age <- function(arr) {
   arr_agg_age <- apply(arr, c(1,2,4), sum)
@@ -1438,6 +1864,479 @@ ggsave(
 
 
 
+### Percentage of averted stratified with baseline serostatus (cases and hospitalizations averted combined)
+```{r}
+get_agg_over_age <- function(arr) {
+  arr_agg_age <- apply(arr, c(1,2,4), sum)
+  return(arr_agg_age)
+}
+
+## cumulative number over year
+get_cumulative_over_time <- function(arr, t_begin, t_end) {
+  arr_cum_time <- apply(arr[, , t_begin:t_end], c(1, 2), sum)
+  return(arr_cum_time)
+}
+
+
+## extract variable from .rds file
+extract_variable <- function(rds_file, variable_name) {
+  
+  result <- readRDS(here::here("model_output",  rds_file) )
+  
+  out_v <- as.data.frame(result$output, stringsAsFactors = FALSE)
+  
+  n_vac_age = result$n_vac_age
+  n_sample = result$n_sample
+  n_age = result$n_age
+  n_year = result$n_year
+  
+  x <- out_v[,colnames(out_v) == variable_name] 
+  
+  y <- array(NA, dim = c(n_vac_age,n_sample, n_age, n_year))
+  
+  for (i in 1:n_vac_age) {
+    
+    y[i,,,] <- x[[paste0("result.", i)]]
+  }
+  
+  return(y)
+}
+
+
+get_averted_serostatus <- function(nv_output, v_output, t_begin, t_end){
+  
+  nv_agg_age <- get_agg_over_age(nv_output)
+  v_agg_age <-  get_agg_over_age(v_output)
+  # total_vac_agg_age <- get_agg_over_age(total_vac_output)
+  
+  nv_cum_t <- get_cumulative_over_time( nv_agg_age, t_begin = t_begin, t_end = t_end)
+  v_cum_t <- get_cumulative_over_time( v_agg_age, t_begin = t_begin, t_end = t_end)
+  # total_vac_cum_t <- get_cumulative_over_time(total_vac_agg_age, t_begin = t_begin, t_end = t_end)
+  
+  averted_serostatus <- 100*(nv_cum_t - v_cum_t)/nv_cum_t
+  
+  
+  return(averted_serostatus)
+  
+}
+
+
+
+get_plot_averted_serostatus <- function(df_total, df_seroneg, df_seropos, y_limits, y_breaks) {
+  
+  
+  # Add a column for age groups
+  df_total$age <- 1:nrow(df_total)
+  df_seroneg$age <- 1:nrow(df_seroneg)
+  df_seropos$age <- 1:nrow(df_seropos)
+  
+  # Reshape the dataframes to long format
+  df_total_long <- gather(df_total, key = "Realization", value = "Output", -age)
+  df_seroneg_long <- gather(df_seroneg, key = "Realization", value = "Output", -age)
+  df_seropos_long <- gather(df_seropos, key = "Realization", value = "Output", -age)
+  
+  # Add a column to indicate the vaccine coverage for each dataset
+  df_total_long$poptype <- "All"
+  df_seroneg_long$poptype <- "Seronegative"
+  df_seropos_long$poptype <- "Seropositive"
+  
+  # Combine all datasets into one long dataframe
+  df_long <- bind_rows(df_total_long, df_seroneg_long, df_seropos_long)
+  
+  # Calculate the mean and 95% confidence interval for each age group and vaccine coverage
+  summary_df <- df_long %>%
+    group_by(age, poptype) %>%
+    summarise(
+      mean_output = mean(Output),
+      lower_bound = quantile(Output, 0.025),
+      upper_bound = quantile(Output, 0.975)
+    ) %>%
+    ungroup()
+  
+  
+  
+  # Define colors for different vaccine coverages
+  poptype_barcolors <- c("All" = "#8dd3c7", "Seronegative" = "#fdb462", "Seropositive" = "#b3de69")
+  
+  poptype_errorbar_colors <- c("All" = "#55a39b", "Seronegative" = "#e08d3e", "Seropositive" = "#85a84e")
+  
+  # Define the dodge position for side-by-side plotting
+  dodge <- position_dodge(width = 0.3)
+  
+  # Plot using ggplot2
+  p <- ggplot(summary_df, aes(x = factor(age), y = mean_output, fill = poptype)) +
+    # geom_point(size = 9, position = dodge, shape = 16) +  # Points for the mean with dodge
+    geom_bar(stat = "identity", position = position_dodge(width = 0.75), width = 0.65) +
+    
+    geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound, color = poptype), 
+                  width = 0.0, size = 1.8, position = position_dodge(width = 0.75)) +
+    # geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound), 
+    #               width = 0.0, size = 1.8, position = dodge) +  # Error bars with dodge
+    scale_fill_manual(values = poptype_barcolors, name = "") + # Custom colors for bars
+    scale_color_manual(values = poptype_errorbar_colors,  name = "") + # Custom colors for error bars
+    # scale_color_manual(values = poptype_colors, name = "") + 
+    scale_x_discrete(
+      breaks = c(1, 2, 3, 4, 5, 6, 7),   # Set the positions of the x-axis ticks
+      labels = c("6-16", "17-30", "31-40", "41-50", "51-60", "61-70", "71-80")  # Labels for age groups
+    ) +
+    # labs(x = "Age at vaccination", y = ylab, color = NULL) +  # Labels for x and y axes
+    scale_y_continuous(limits = y_limits, breaks = y_breaks) +  # Define y-axis tick points )+
+    theme_bw() +  # Clean theme
+    theme(
+      axis.ticks.length = unit(0.4, "cm"),        # Increase the length of the ticks
+      axis.ticks = element_line(size = 1.5),      # Increase the thickness of the ticks
+      panel.border = element_rect(color = "black", size = 2),  # Thicker border
+      plot.margin = margin(t=10, r=10, b=20, l=25),
+      axis.text.x = element_text(size = 35, color="black", angle= 30, margin = margin(t = 10, b = 20)),
+      axis.text.y = element_text(size = 35,color="black", margin = margin(r = 10, l = 30)),
+      # axis.title = element_text(size = 35, color = "black"),
+      axis.title = element_blank(),
+      legend.position = "top",
+      legend.direction = "horizontal",
+      legend.text = element_text(size = 40),
+      legend.key.size = unit(2, "cm"),  # Increase size of legend keys
+      legend.key.height = unit(1.5, "cm"),  # Increase height of legend keys
+      legend.key.width = unit(2.5, "cm"),  # Increase width of legend keys
+      legend.background = element_blank()
+    )
+  
+   return(list(plot = p, summary = summary_df))
+  
+}
+
+
+get_arranged_plot_averted_serostatus_combined <- function(set_of_rds_files, variable_name1, variable_name2, y_lab1, y_lab2, t_begin, t_end) {
+  
+  plot_list_cases <- list()
+  plot_list_hosp <- list()
+  # summary_list <- list()
+  
+  for (i in seq_along(set_of_rds_files)) {
+    
+    rds_files <- set_of_rds_files[[i]]
+    
+    ## for total population
+    nv_total_cases <- extract_variable(rds_file = rds_files[1] , 
+                            variable_name = variable_name1) + 
+      extract_variable(rds_file =  rds_files[1], 
+                       variable_name = paste0(variable_name1, "_v"))
+    
+    
+    v_total_cases <- extract_variable(rds_file = rds_files[2] , 
+                                 variable_name = variable_name1) + 
+      extract_variable(rds_file =  rds_files[2], 
+                       variable_name = paste0(variable_name1, "_v"))
+    
+    ## seronegative
+    nv_seroneg_cases <- extract_variable(rds_file = rds_files[1] , 
+                                 variable_name = paste0(variable_name1, "_primary")) + 
+      extract_variable(rds_file =  rds_files[1], 
+                       variable_name = paste0(variable_name1, "_v_primary"))
+    
+    
+    v_seroneg_cases <- extract_variable(rds_file = rds_files[2] , 
+                                variable_name = paste0(variable_name1, "_primary")) + 
+      extract_variable(rds_file =  rds_files[2], 
+                       variable_name = paste0(variable_name1, "_v_primary"))
+    
+    ## seropositive
+    nv_seropos_cases <- extract_variable(rds_file = rds_files[1] , 
+                                   variable_name = paste0(variable_name1, "_secondary")) + 
+      extract_variable(rds_file =  rds_files[1], 
+                       variable_name = paste0(variable_name1, "_v_secondary"))
+    
+    
+    v_seropos_cases <- extract_variable(rds_file = rds_files[2] , 
+                                  variable_name = paste0(variable_name1, "_secondary")) + 
+      extract_variable(rds_file =  rds_files[2], 
+                       variable_name = paste0(variable_name1, "_v_secondary"))
+    
+    
+    averted_serostatus_total_cases <- get_averted_serostatus(nv_output = nv_total_cases,
+                                                 v_output = v_total_cases,
+                                                 t_begin = t_begin,
+                                                 t_end = t_end)
+    
+    averted_serostatus_seroneg_cases <- get_averted_serostatus(nv_output = nv_seroneg_cases,
+                                                   v_output = v_seroneg_cases,
+                                                   t_begin = t_begin,
+                                                   t_end = t_end)
+    
+    averted_serostatus_seropos_cases <- get_averted_serostatus(nv_output = nv_seropos_cases,
+                                                   v_output = v_seropos_cases,
+                                                   t_begin = t_begin,
+                                                   t_end = t_end)
+    
+    df_averted_serostatus_total_cases <- as.data.frame(averted_serostatus_total_cases)
+    
+    df_averted_serostatus_seroneg_cases <- as.data.frame(averted_serostatus_seroneg_cases)
+    
+    df_averted_serostatus_seropos_cases <- as.data.frame(averted_serostatus_seropos_cases)
+    
+    
+    
+    
+    # Determine y-axis settings for this figure
+    if (i == 1 ) {  # Example: The second figure requires different limits
+      y_limits <- custom_y_limits1_cases
+      y_breaks <- custom_y_breaks1_cases
+      
+    } else if (i == 2) {
+      y_limits <- custom_y_limits2_cases
+      y_breaks <- custom_y_breaks2_cases
+      
+    } else if (i == 3) {
+      y_limits <- custom_y_limits3_cases
+      y_breaks <- custom_y_breaks3_cases
+      
+    }  else if (i == 4) {
+      y_limits <- custom_y_limits4_cases
+      y_breaks <- custom_y_breaks4_cases
+    }
+    
+    
+  
+    result_cases <- get_plot_averted_serostatus(
+      df_total = df_averted_serostatus_total_cases,
+      df_seroneg = df_averted_serostatus_seroneg_cases,
+      df_seropos = df_averted_serostatus_seropos_cases,
+      y_limits = y_limits,
+      y_breaks = y_breaks)
+   
+    averted_plot_serostatus_cases <- result_cases$plot
+    
+    plot_list_cases[[i]] <-  averted_plot_serostatus_cases
+    # summary_list[[i]] <- result$summary
+    
+  }
+  
+  
+#### now for hospitalizations
+  
+  
+   for (i in seq_along(set_of_rds_files)) {
+    
+    rds_files <- set_of_rds_files[[i]]
+    
+    ## for total population
+    nv_total_hosp <- extract_variable(rds_file = rds_files[1] , 
+                            variable_name = variable_name2) + 
+      extract_variable(rds_file =  rds_files[1], 
+                       variable_name = paste0(variable_name2, "_v"))
+    
+    
+    v_total_hosp <- extract_variable(rds_file = rds_files[2] , 
+                                 variable_name = variable_name2) + 
+      extract_variable(rds_file =  rds_files[2], 
+                       variable_name = paste0(variable_name2, "_v"))
+    
+    ## seronegative
+    nv_seroneg_hosp <- extract_variable(rds_file = rds_files[1] , 
+                                 variable_name = paste0(variable_name2, "_primary")) + 
+      extract_variable(rds_file =  rds_files[1], 
+                       variable_name = paste0(variable_name2, "_v_primary"))
+    
+    
+    v_seroneg_hosp <- extract_variable(rds_file = rds_files[2] , 
+                                variable_name = paste0(variable_name2, "_primary")) + 
+      extract_variable(rds_file =  rds_files[2], 
+                       variable_name = paste0(variable_name2, "_v_primary"))
+    
+    ## seropositive
+    nv_seropos_hosp <- extract_variable(rds_file = rds_files[1] , 
+                                   variable_name = paste0(variable_name2, "_secondary")) + 
+      extract_variable(rds_file =  rds_files[1], 
+                       variable_name = paste0(variable_name2, "_v_secondary"))
+    
+    
+    v_seropos_hosp <- extract_variable(rds_file = rds_files[2] , 
+                                  variable_name = paste0(variable_name2, "_secondary")) + 
+      extract_variable(rds_file =  rds_files[2], 
+                       variable_name = paste0(variable_name2, "_v_secondary"))
+    
+    
+    averted_serostatus_total_hosp <- get_averted_serostatus(nv_output = nv_total_hosp,
+                                                 v_output = v_total_hosp,
+                                                 t_begin = t_begin,
+                                                 t_end = t_end)
+    
+    averted_serostatus_seroneg_hosp <- get_averted_serostatus(nv_output = nv_seroneg_hosp,
+                                                   v_output = v_seroneg_hosp,
+                                                   t_begin = t_begin,
+                                                   t_end = t_end)
+    
+    averted_serostatus_seropos_hosp <- get_averted_serostatus(nv_output = nv_seropos_hosp,
+                                                   v_output = v_seropos_hosp,
+                                                   t_begin = t_begin,
+                                                   t_end = t_end)
+    
+    df_averted_serostatus_total_hosp <- as.data.frame(averted_serostatus_total_hosp)
+    
+    df_averted_serostatus_seroneg_hosp <- as.data.frame(averted_serostatus_seroneg_hosp)
+    
+    df_averted_serostatus_seropos_hosp <- as.data.frame(averted_serostatus_seropos_hosp)
+    
+    # Determine y-axis settings for this figure
+    if (i == 1 ) {  # Example: The second figure requires different limits
+      y_limits <- custom_y_limits1_hosp
+      y_breaks <- custom_y_breaks1_hosp
+      
+    } else if (i == 2) {
+      y_limits <- custom_y_limits2_hosp
+      y_breaks <- custom_y_breaks2_hosp
+      
+    } else if (i == 3) {
+      y_limits <- custom_y_limits3_hosp
+      y_breaks <- custom_y_breaks3_hosp
+      
+    }  else if (i == 4) {
+      y_limits <- custom_y_limits4_hosp
+      y_breaks <- custom_y_breaks4_hosp
+    }
+    
+    
+  
+    result_hosp <- get_plot_averted_serostatus(
+      df_total = df_averted_serostatus_total_hosp,
+      df_seroneg = df_averted_serostatus_seroneg_hosp,
+      df_seropos = df_averted_serostatus_seropos_hosp,
+      y_limits = y_limits,
+      y_breaks = y_breaks)
+   
+    averted_plot_serostatus_hosp <- result_hosp$plot
+    
+    plot_list_hosp[[i]] <-  averted_plot_serostatus_hosp
+   
+    
+  }
+  
+
+  ### combine the plot
+  plot_list <- c(plot_list_cases, plot_list_hosp)
+  
+  
+  ## remove legend in each of the figure
+  plot_list_wo_legend <- list()
+  
+  for (i in seq_along(plot_list)) {
+    plot_list_wo_legend[[i]] <- plot_list[[i]] + theme(legend.position = "none")
+  }  
+  
+  ## extrct the legend  
+  legend_plot <- get_legend(averted_plot_serostatus_cases)  
+  
+  # Create the grid of plots without individual x and y labels
+  plot_wo_labels <- plot_grid(
+    plotlist = plot_list_wo_legend,
+    nrow = 4,
+    ncol = 2,
+    align = "hv",
+    axis = "tblr",
+    labels = c("(a)", "(b)", "(c)", "(d)", "(e)", "(f)", "(g)", "(h)"),  # Add subfigure labels
+    label_size = 40,                        # Adjust label size
+    label_x = 0.03,                         # Adjust horizontal position of labels
+    label_y = 1.08                          # Adjust vertical position of labels
+  )
+  
+  plot_with_labels <- ggdraw() +
+    draw_plot(plot_wo_labels, x = 0, y = 0, width = 1, height = 1) +   
+    draw_label(y_lab1, x = 0.01, y = 0.78, angle = 90, size = 45, fontface = "bold") +  # Y-axis label
+    draw_label(y_lab2, x = 0.01, y = 0.28, angle = 90, size = 45, fontface = "bold") +  # Y-axis label
+    draw_label("Age at vaccination (year)", x = 0.5, y = 0.025, angle = 0, size = 45, fontface = "bold")           # X-axis label
+  
+  # make grid of plots  
+  final_plot_with_legend <- plot_grid(
+    legend_plot,
+    plot_with_labels,
+    nrow = 2, 
+    rel_heights = c(0.1,1)  
+  )
+  
+  return(final_plot_with_legend)
+  
+}  
+
+
+
+### Inputs
+
+
+## List all the datasets that we want to plot together
+set_of_rds_files <- list(
+  c("pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds"),  # Set 1
+
+  c("pri_sec_neq_detailed_a7_sero_dom_denv2_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds"),  # Set 2
+
+  c("pri_sec_neq_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_no_nsamp_100_waning_0.rds"),  # Set 3
+
+  c("pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0.rds")    # Set 4
+)
+
+
+## grab the start of vaccination year from one of the dataset
+t_begin = readRDS(here::here("model_output",set_of_rds_files[[1]][1]) )$v_year 
+
+custom_y_limits1_cases <- c(0, 16.5)
+custom_y_breaks1_cases <- seq(0, 15, by = 3)
+
+
+custom_y_limits2_cases <- c(0, 16.5)
+custom_y_breaks2_cases <- seq(0, 15, by = 3)
+
+# Custom y-axis settings for a specific figure (for negative impact)(change it accordingly)
+custom_y_limits3_cases <- c(-6, 15)
+custom_y_breaks3_cases <- seq(-6, 15, by = 3)
+
+custom_y_limits4_cases <- c(-64, 15)
+custom_y_breaks4_cases <- seq(-60, 15, by = 15)
+
+
+## for hospitalization
+
+custom_y_limits1_hosp <- c(0, 20)
+custom_y_breaks1_hosp <- seq(0, 20, by = 5)
+
+
+custom_y_limits2_hosp <- c(0, 20)
+custom_y_breaks2_hosp <- seq(0, 20, by = 5)
+
+# Custom y-axis settings for a specific figure (for negative impact)(change it accordingly)
+custom_y_limits3_hosp <- c(-40, 20)
+custom_y_breaks3_hosp <- seq(-40, 20, by = 10)
+
+custom_y_limits4_hosp <- c(-60, 20)
+custom_y_breaks4_hosp <- seq(-60, 20, by = 20)
+
+
+
+## Generate figure now
+plot_impact <- get_arranged_plot_averted_serostatus_combined(set_of_rds_files = set_of_rds_files,
+                                                                    variable_name1 = "symp_sample_age",
+                                                                    variable_name2 = "hosp_sample_age",
+                                                                    y_lab1 = "Reported cases averted (%)",
+                                                                    y_lab2 = "Hospitalizations averted (%)",
+                                                                    t_begin = t_begin,
+                                                                    t_end = t_begin + 9)
+
+figure_name <- "percent_averted_serop_seron_symp_hosp_combined.jpg"
+
+## save
+ggsave(
+  filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
+  plot = plot_impact,                                            # The plot object to save
+  width = 29*2,                                           # Width in inches
+  height = 80,                                          # Height in inches
+  dpi = 300,
+  units = "cm")                                  # DPI (resolution)
+
+```
+
+
+
 ### Percentage of cases averted  With vs without efficacy against infection
 ```{r}
 get_agg_over_age <- function(arr) {
@@ -2132,6 +3031,460 @@ ggsave(
 
 ```
 
+
+
+
+
+
+
+
+
+### Percentage averted  With vs without efficacy against infection (cases and hospitalization combined)
+```{r}
+get_agg_over_age <- function(arr) {
+  arr_agg_age <- apply(arr, c(1,2,4), sum)
+  return(arr_agg_age)
+}
+
+## cumulative number over year
+get_cumulative_over_time <- function(arr, t_begin, t_end) {
+  arr_cum_time <- apply(arr[, , t_begin:t_end], c(1, 2), sum)
+  return(arr_cum_time)
+}
+
+
+## extract variable from .rds file
+extract_variable <- function(rds_file, variable_name) {
+  
+  result <- readRDS(here::here("model_output",  rds_file) )
+  
+  out_v <- as.data.frame(result$output, stringsAsFactors = FALSE)
+  
+  n_vac_age = result$n_vac_age
+  n_sample = result$n_sample
+  n_age = result$n_age
+  n_year = result$n_year
+  
+  x <- out_v[,colnames(out_v) == variable_name] 
+  
+  y <- array(NA, dim = c(n_vac_age,n_sample, n_age, n_year))
+  
+  for (i in 1:n_vac_age) {
+    
+    y[i,,,] <- x[[paste0("result.", i)]]
+  }
+  
+  return(y)
+}
+
+
+get_averted_effi_inf <- function(nv_output, v_output, t_begin, t_end){
+  
+  nv_agg_age <- get_agg_over_age(nv_output)
+  v_agg_age <-  get_agg_over_age(v_output)
+  
+  
+  nv_cum_t <- get_cumulative_over_time( nv_agg_age, t_begin = t_begin, t_end = t_end)
+  v_cum_t <- get_cumulative_over_time( v_agg_age, t_begin = t_begin, t_end = t_end)
+  
+  averted_effi_inf <- 100*(nv_cum_t - v_cum_t)/nv_cum_t 
+  
+  
+  
+  return(averted_effi_inf)
+  
+}
+
+
+get_plot_averted_with_without_effi_inf <- function(df_with_effi_inf, df_without_effi_inf, y_limits, y_breaks) {
+  
+  
+  # Add a column for age groups
+  df_with_effi_inf$age <- 1:nrow(df_with_effi_inf)
+  df_without_effi_inf$age <- 1:nrow(df_without_effi_inf)
+  
+  
+  # Reshape the dataframes to long format
+  df_with_effi_inf_long <- gather(df_with_effi_inf, key = "Realization", value = "Output", -age)
+  df_without_effi_inf_long <- gather(df_without_effi_inf, key = "Realization", value = "Output", -age)
+  
+  
+  # Add a column to indicate the vaccine coverage for each dataset
+  df_with_effi_inf_long$efficacy_type <- "With efficacy against infection"
+  df_without_effi_inf_long$efficacy_type <- "Without efficacy against infection"
+  
+  # Combine all datasets into one long dataframe
+  df_long <- bind_rows(df_with_effi_inf_long, df_without_effi_inf_long)
+  
+  # Calculate the mean and 95% confidence interval for each age group and vaccine coverage
+  summary_df <- df_long %>%
+    group_by(age, efficacy_type) %>%
+    summarise(
+      mean_output = mean(Output),
+      lower_bound = quantile(Output, 0.025),
+      upper_bound = quantile(Output, 0.975)
+    ) %>%
+    ungroup()
+  
+
+  # Define colors for different vaccine coverages
+  efficacy_type_barcolors <- c("With efficacy against infection" = "#fb8072", "Without efficacy against infection" = "#80b1d3")
+  efficacy_type_errorbar_colors <- c("With efficacy against infection" = "#cc5045", "Without efficacy against infection" = "#40759a")
+  # Define the dodge position for side-by-side plotting
+  dodge <- position_dodge(width = 0.5)
+  
+  # Plot using ggplot2
+  p <- ggplot(summary_df, aes(x = factor(age), y = mean_output, fill = efficacy_type)) +
+    # geom_point(size = 9, position = dodge, shape = 16) +  # Points for the mean with dodge
+    geom_bar(stat = "identity", position = position_dodge(width = 0.75), width = 0.65) +
+    
+    geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound, color = efficacy_type), 
+                  width = 0.0, size = 1.8, position = position_dodge(width = 0.75)) +
+    # geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound), 
+    #               width = 0.0, size = 1.8, position = dodge) +  # Error bars with dodge
+    scale_fill_manual(values = efficacy_type_barcolors, name = "") + # Custom colors for bars
+    scale_color_manual(values = efficacy_type_errorbar_colors,  name = "") + # Custom colors for error bars
+    # scale_color_manual(values = poptype_colors, name = "") + 
+    scale_x_discrete(
+      breaks = c(1, 2, 3, 4, 5, 6, 7),   # Set the positions of the x-axis ticks
+      labels = c("6-16", "17-30", "31-40", "41-50", "51-60", "61-70", "71-80")  # Labels for age groups
+    ) +
+    # labs(x = "Age at vaccination", y = ylab, color = NULL) +  # Labels for x and y axes
+    scale_y_continuous(limits = y_limits, breaks = y_breaks) +  # Define y-axis tick points )+
+    theme_bw() +  # Clean theme
+    theme(
+      axis.ticks.length = unit(0.4, "cm"),        # Increase the length of the ticks
+      axis.ticks = element_line(size = 1.5),      # Increase the thickness of the ticks
+      panel.border = element_rect(color = "black", size = 2),  # Thicker border
+      plot.margin = margin(t=10, r=10, b=20, l=25),
+      axis.text.x = element_text(size = 35, color="black", angle= 30, margin = margin(t = 10, b = 20)),
+      axis.text.y = element_text(size = 35,color="black", margin = margin(r = 10, l = 30)),
+      # axis.title = element_text(size = 35, color = "black"),
+      axis.title = element_blank(),
+      legend.position = "top",
+      legend.direction = "horizontal",
+      legend.text = element_text(size = 40),
+      legend.key.size = unit(2, "cm"),  # Increase size of legend keys
+      legend.key.height = unit(1.5, "cm"),  # Increase height of legend keys
+      legend.key.width = unit(2.5, "cm"),  # Increase width of legend keys
+      legend.background = element_blank()
+    )
+  
+     return(list(plot = p, summary = summary_df))
+  
+}
+
+
+
+get_arranged_plot_averted_with_without_effi_inf_combined <- function(set_of_rds_files, variable_name1, variable_name2, y_lab1,y_lab2, t_begin, t_end) {
+  
+  # summary_list <- list()
+  plot_list_cases <- list()
+  plot_list_hosp <- list()
+  
+  for (i in seq_along(set_of_rds_files)) {
+    
+    rds_files <- set_of_rds_files[[i]]
+    
+    ## for total population
+    nv_with_effi_inf_cases  <- extract_variable(rds_file = rds_files[1] , 
+                                 variable_name = variable_name1) + 
+      extract_variable(rds_file =  rds_files[1], 
+                       variable_name = paste0(variable_name1, "_v"))
+    
+    v_with_effi_inf_cases <- extract_variable(rds_file = rds_files[2] , 
+                                        variable_name = variable_name1) + 
+      extract_variable(rds_file =  rds_files[2], 
+                       variable_name = paste0(variable_name1, "_v"))
+    
+    
+    
+    
+    nv_without_effi_inf_cases <- extract_variable(rds_file = rds_files[3] , 
+                                variable_name = variable_name1) + 
+      extract_variable(rds_file =  rds_files[3], 
+                       variable_name = paste0(variable_name1, "_v"))
+    
+    v_without_effi_inf_cases <- extract_variable(rds_file = rds_files[4] , 
+                                        variable_name = variable_name1) + 
+      extract_variable(rds_file =  rds_files[4], 
+                       variable_name = paste0(variable_name1, "_v"))
+    
+
+   
+    averted_with_effi_inf_cases <- get_averted_effi_inf(nv_output = nv_with_effi_inf_cases,
+                                                 v_output = v_with_effi_inf_cases,
+                                                 t_begin = t_begin,
+                                                 t_end = t_end)
+    
+    averted_without_effi_inf_cases <- get_averted_effi_inf(nv_output = nv_without_effi_inf_cases,
+                                                   v_output = v_without_effi_inf_cases,
+                                                   t_begin = t_begin,
+                                                   t_end = t_end)
+
+    df_averted_with_effi_inf_cases <- as.data.frame(averted_with_effi_inf_cases)
+    
+    df_averted_without_effi_inf_cases <- as.data.frame(averted_without_effi_inf_cases)
+    
+  
+    
+    
+    # Determine y-axis settings for this figure
+    if (i == 1 ) {  # Example: The second figure requires different limits
+      y_limits <- custom_y_limits1_cases
+      y_breaks <- custom_y_breaks1_cases
+      
+    } else if (i == 2) {
+      y_limits <- custom_y_limits2_cases
+      y_breaks <- custom_y_breaks2_cases
+      
+    }else if (i == 3) {
+      y_limits <- custom_y_limits3_cases
+      y_breaks <- custom_y_breaks3_cases
+      
+    }else if (i == 4) {
+      y_limits <- custom_y_limits4_cases
+      y_breaks <- custom_y_breaks4_cases
+      
+    }
+    
+    
+    result_cases <- get_plot_averted_with_without_effi_inf(
+      df_with_effi_inf =  df_averted_with_effi_inf_cases,
+      df_without_effi_inf = df_averted_without_effi_inf_cases,
+      y_limits = y_limits,
+      y_breaks = y_breaks)
+    
+    averted_plot_with_without_effi_inf_cases <- result_cases$plot
+    plot_list_cases[[i]] <-  averted_plot_with_without_effi_inf_cases
+    # summary_list[[i]] <- result$summary
+
+    
+  }
+  
+
+  
+  ## now for hospitalizations
+  
+   for (i in seq_along(set_of_rds_files)) {
+    
+    rds_files <- set_of_rds_files[[i]]
+    
+    ## for total population
+    nv_with_effi_inf_hosp  <- extract_variable(rds_file = rds_files[1] , 
+                                 variable_name = variable_name2) + 
+      extract_variable(rds_file =  rds_files[1], 
+                       variable_name = paste0(variable_name2, "_v"))
+    
+    v_with_effi_inf_hosp <- extract_variable(rds_file = rds_files[2] , 
+                                        variable_name = variable_name2) + 
+      extract_variable(rds_file =  rds_files[2], 
+                       variable_name = paste0(variable_name2, "_v"))
+    
+    
+    
+    
+    nv_without_effi_inf_hosp <- extract_variable(rds_file = rds_files[3] , 
+                                variable_name = variable_name2) + 
+      extract_variable(rds_file =  rds_files[3], 
+                       variable_name = paste0(variable_name2, "_v"))
+    
+    v_without_effi_inf_hosp <- extract_variable(rds_file = rds_files[4] , 
+                                        variable_name = variable_name2) + 
+      extract_variable(rds_file =  rds_files[4], 
+                       variable_name = paste0(variable_name2, "_v"))
+    
+
+   
+    averted_with_effi_inf_hosp <- get_averted_effi_inf(nv_output = nv_with_effi_inf_hosp,
+                                                 v_output = v_with_effi_inf_hosp,
+                                                 t_begin = t_begin,
+                                                 t_end = t_end)
+    
+    averted_without_effi_inf_hosp <- get_averted_effi_inf(nv_output = nv_without_effi_inf_hosp,
+                                                   v_output = v_without_effi_inf_hosp,
+                                                   t_begin = t_begin,
+                                                   t_end = t_end)
+
+    df_averted_with_effi_inf_hosp <- as.data.frame(averted_with_effi_inf_hosp)
+    
+    df_averted_without_effi_inf_hosp <- as.data.frame(averted_without_effi_inf_hosp)
+    
+  
+    
+    
+    # Determine y-axis settings for this figure
+    if (i == 1 ) {  # Example: The second figure requires different limits
+      y_limits <- custom_y_limits1_hosp
+      y_breaks <- custom_y_breaks1_hosp
+      
+    } else if (i == 2) {
+      y_limits <- custom_y_limits2_hosp
+      y_breaks <- custom_y_breaks2_hosp
+      
+    }else if (i == 3) {
+      y_limits <- custom_y_limits3_hosp
+      y_breaks <- custom_y_breaks3_hosp
+      
+    }else if (i == 4) {
+      y_limits <- custom_y_limits4_hosp
+      y_breaks <- custom_y_breaks4_hosp
+      
+    }
+    
+    
+    result_hosp <- get_plot_averted_with_without_effi_inf(
+      df_with_effi_inf =  df_averted_with_effi_inf_hosp,
+      df_without_effi_inf = df_averted_without_effi_inf_hosp,
+      y_limits = y_limits,
+      y_breaks = y_breaks)
+    
+    averted_plot_with_without_effi_inf_hosp <- result_hosp$plot
+    plot_list_hosp[[i]] <-  averted_plot_with_without_effi_inf_hosp
+    # summary_list[[i]] <- result$summary
+
+    
+  }
+  
+  
+  
+  
+  ## combine the plots
+  
+  plot_list <- c(plot_list_cases, plot_list_hosp)
+  
+  
+  
+  
+  
+  ## remove legend in each of the figure
+  plot_list_wo_legend <- list()
+  
+  for (i in seq_along(plot_list)) {
+    plot_list_wo_legend[[i]] <- plot_list[[i]] + theme(legend.position = "none")
+  }  
+  
+  ## extrct the legend  
+  legend_plot <- get_legend(averted_plot_with_without_effi_inf_cases)  
+  
+  # Create the grid of plots without individual x and y labels
+  plot_wo_labels <- plot_grid(
+    plotlist = plot_list_wo_legend,
+    nrow = 4,
+    ncol = 2,
+    align = "hv",
+    axis = "tblr",
+    labels = c("(a)", "(b)", "(c)", "(d)", "(e)", "(f)", "(g)", "(h)"),  # Add subfigure labels
+    label_size = 40,                        # Adjust label size
+    label_x = 0.03,                         # Adjust horizontal position of labels
+    label_y = 1.08                          # Adjust vertical position of labels
+  )
+  
+  plot_with_labels <- ggdraw() +
+    draw_plot(plot_wo_labels, x = 0, y = 0, width = 1, height = 1) +   
+    draw_label(y_lab1, x = 0.01, y = 0.78, angle = 90, size = 45, fontface = "bold") +  # Y-axis label
+    draw_label(y_lab2, x = 0.01, y = 0.28, angle = 90, size = 45, fontface = "bold") +  # Y-axis label
+    draw_label("Age at vaccination (year)", x = 0.5, y = 0.025, angle = 0, size = 45, fontface = "bold")           # X-axis label
+  
+  # make grid of plots  
+  final_plot_with_legend <- plot_grid(
+    legend_plot,
+    plot_with_labels,
+    nrow = 2, 
+    rel_heights = c(0.1,1)  
+  )
+  
+  return(final_plot_with_legend)
+  
+}  
+
+
+
+### Inputs
+
+## List all the datasets that we want to plot together
+set_of_rds_files <- list(
+  c("effi_inf_pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
+    "effi_inf_pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv1_vcov_0.8_baseline_no_nsamp_100_waning_0.rds"),  # Set 1
+  
+ c("effi_inf_pri_sec_neq_detailed_a7_sero_dom_denv2_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
+    "effi_inf_pri_sec_neq_detailed_a7_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv2_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv2_vcov_0.8_baseline_no_nsamp_100_waning_0.rds"),  # Set 2
+  
+ c("effi_inf_pri_sec_neq_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
+    "effi_inf_pri_sec_neq_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv3_vcov_0.8_baseline_no_nsamp_100_waning_0.rds"),   # Set 3
+  
+ c("effi_inf_pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds", 
+    "effi_inf_pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_yes_nsamp_100_waning_0.rds",
+    "pri_sec_neq_detailed_a7_sero_dom_denv4_vcov_0.8_baseline_no_nsamp_100_waning_0.rds")   # Set 4
+)
+
+## grab the start of vaccination year from one of the dataset
+t_begin = readRDS(here::here("model_output",set_of_rds_files[[1]][1]) )$v_year 
+
+# General y-axis settings
+
+
+
+custom_y_limits1_cases <- c(-10, 40)
+custom_y_breaks1_cases <- seq(-10, 40, by = 10)
+
+custom_y_limits2_cases <- c(-24, 68)
+custom_y_breaks2_cases <- seq(-20, 60, by = 20)
+
+# Custom y-axis settings for a specific figure (for negative impact)(change it accordingly)
+custom_y_limits3_cases <- c(0, 20)
+custom_y_breaks3_cases <- seq(0, 20, by = 5)
+
+custom_y_limits4_cases <- c(-20, 30)
+custom_y_breaks4_cases <- seq(-20, 30, by = 10)
+
+
+ ## for hospitalizations
+custom_y_limits1_hosp <- c(-10, 41)
+custom_y_breaks1_hosp <- seq(-10, 40, by = 10)
+
+custom_y_limits2_hosp <- c(-30, 68)
+custom_y_breaks2_hosp <- seq(-30, 60, by = 15)
+
+# Custom y-axis settings for a specific figure (for negative impact)(change it accordingly)
+custom_y_limits3_hosp <- c(0, 25)
+custom_y_breaks3_hosp <- seq(0, 25, by = 5)
+
+custom_y_limits4_hosp <- c(-0.05, 30)
+custom_y_breaks4_hosp <- seq(0, 30, by = 5)
+
+
+
+## Generate figure now
+plot_fig <- get_arranged_plot_averted_with_without_effi_inf_combined(set_of_rds_files = set_of_rds_files,
+                                                                              variable_name1 = "symp_sample_age",
+                                                                              variable_name2 = "hosp_sample_age",
+                                                                              y_lab1 = "Reported cases averted (%)", 
+                                                                              y_lab2 = "Hospitalizations averted (%)",
+                                                                              t_begin = t_begin,
+                                                                              t_end = t_begin + 9)
+
+figure_name <- "percent_averted_effi_inf_symp_hosp_combined.jpg"
+
+### save
+ggsave(
+  filename = file.path(here("figure"), figure_name),  # Combine folder path and file name
+  plot = plot_fig,                                            # The plot object to save
+  width = 29*2,                                           # Width in inches
+  height = 80,                                          # Height in inches
+  dpi = 300,
+  units = "cm")                                  # DPI (resolution)
+
+
+
+```
 
 
 

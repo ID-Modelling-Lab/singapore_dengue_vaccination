@@ -10,6 +10,7 @@
 /code/figure/hosp_rate_scenario/*
 /cea_dengue/*
 /submission/*
+/code/data/raw_data/*
 /singapore_historical_vaccine_impact/*
 .Rproj.user
 .Rhistory
