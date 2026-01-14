@@ -124,7 +124,7 @@ get_plot_averted <- function(df_v20, df_v50, df_v80, y_limits, y_breaks) {
       axis.ticks = element_line(size = 1.5),      # Increase the thickness of the ticks
       panel.border = element_rect(color = "black", size = 2),  # Thicker border
       plot.margin = margin(t=10, r=10, b=20, l=20),
-      axis.text.x = element_text(size = 35, color="black", angle= 0, margin = margin(t = 10, b = 20)),
+      axis.text.x = element_text(size = 35, color="black", angle = 0, margin = margin(t = 10, b = 20)),
       axis.text.y = element_text(size = 35,color="black", margin = margin(r = 10, l = 10)),
       # axis.title = element_text(size = 35, color = "black"),
       axis.title = element_blank(),
