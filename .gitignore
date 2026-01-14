@@ -7,10 +7,13 @@
 /code/renv.lock/
 /code/figure/old/*
 /code/figure/poster/*
+/code/projection/old/*
 /code/figure/hosp_rate_scenario/*
 /cea_dengue/*
 /submission/*
+/code/fitting/transmission_model_fitting_age.Rmd
 /code/data/raw_data/*
+/code/data/dengue-cases-climate_with-2023.csv
 /singapore_historical_vaccine_impact/*
 .Rproj.user
 .Rhistory
