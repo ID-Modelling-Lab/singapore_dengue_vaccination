@@ -10,5 +10,5 @@ The posterior distribution will be saved in `.../fitting/fitting_output`.
 Run `.../projection/run_vac_projection.R` to generate the impact estimates presented in the study.
 The output will be saved as a `.rds` file in `.../model_output`.
 # Plotting
-To generate the figures run `.../projection/plot_for_paper`.
+To generate the figures run `.../projection/plot_for_paper.rmd`.
 Each chunk will generate a figure presented in the study. The descriptions with figure labels are given in each chunk.
